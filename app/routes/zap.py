@@ -6,12 +6,19 @@ import requests
 
 router = APIRouter()
 
-ZAPI_INSTANCE = "sua_instancia"
-ZAPI_TOKEN = "seu_token"
+# 🔐 Substitua pelos dados reais da sua instância Z-API
+ZAPI_INSTANCE = "3DFEBC76D35C60755AF8FA8592F99CB9"
+ZAPI_TOKEN = "108648BD703ADBBBE798F920"
 ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
-    requests.post(f"{ZAPI_URL}/send-messages", json={{"phone": numero, "message": mensagem}})
+    requests.post(
+        f"{ZAPI_URL}/send-message",
+        json={
+            "phone": numero,
+            "message": mensagem
+        }
+    )
 
 @router.post("/webhook")
 async def receber_msg(request: Request):
@@ -27,9 +34,10 @@ async def receber_msg(request: Request):
     else:
         produtos_lista = db.execute(select(produtos)).fetchall()
         for p in produtos_lista:
-            if p._mapping["nome"].lower() in msg:
-                resposta = f"{p._mapping['nome']} custa R$ {p._mapping['preco']:.2f}"
+            p_mapping = dict(p._mapping)
+            if p_mapping["nome"].lower() in msg:
+                resposta = f"{p_mapping['nome']} custa R$ {p_mapping['preco']:.2f}"
                 break
 
     enviar_whatsapp(numero, resposta)
-    return {{"status": "ok"}}
+    return {"status": "ok"}
