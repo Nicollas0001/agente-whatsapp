@@ -15,11 +15,3 @@ app.include_router(zap.router, prefix="/zap", tags=["WhatsApp"])
 @app.get("/")
 def home():
     return {"msg": "Agente completo rodando com todos os módulos"}
-
-# ✅ Adicione isso no final do arquivo
-if __name__ == "__main__":
-    import os
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
