@@ -3,8 +3,8 @@ import requests
 
 router = APIRouter()
 
-ZAPI_INSTANCE = "SEU_ID"
-ZAPI_TOKEN = "SEU_TOKEN"
+ZAPI_INSTANCE = "3DFEBC76D35C60755AF8FA8592F99CB9"
+ZAPI_TOKEN = "SEU_TOK108648BD703ADBBBE798F920EN"
 ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
