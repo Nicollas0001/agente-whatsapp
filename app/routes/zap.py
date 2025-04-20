@@ -16,7 +16,9 @@ def enviar_whatsapp(numero: str, mensagem: str):
         "phone": numero,
         "message": mensagem
     }
-    requests.post(url, json=payload)
+    print(f"📤 Enviando mensagem para {numero}: {mensagem}")
+    response = requests.post(url, json=payload)
+    print(f"📨 Resposta Z-API: {response.status_code} - {response.text}")
 
 @router.post("/webhook")
 async def receber_msg(request: Request):
@@ -39,5 +41,7 @@ async def receber_msg(request: Request):
                 resposta = f"{p_mapping['nome']} custa R$ {p_mapping['preco']:.2f}"
                 break
 
+    print("✅ Vai enviar resposta automática...")
     enviar_whatsapp(numero, resposta)
+
     return {"status": "ok"}
