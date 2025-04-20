@@ -3,7 +3,6 @@ from sqlalchemy import select
 from app.models.produto import produtos
 from app.models.database import SessionLocal
 import requests
-import json
 
 router = APIRouter()
 
@@ -13,27 +12,19 @@ ZAPI_TOKEN = "108648BD703ADBBBE798F920"
 ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
-    headers = {
-        "Client-Token": ZAPI_TOKEN,
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "phone": numero,
-        "message": mensagem
-    }
-
-    resposta = requests.post(
-        f"{ZAPI_URL}/send-message",
-        headers=headers,
-        data=json.dumps(payload)
+    requests.post(
+        f"{ZAPI_URL}/send-messages",  # ✅ corrigido aqui
+        headers={"Client-Token": ZAPI_TOKEN},
+        json={
+            "phone": numero,
+            "message": mensagem
+        }
     )
-    print("📤 Resposta da Z-API:", resposta.status_code, resposta.text)
 
 @router.post("/webhook")
 async def receber_msg(request: Request):
     dados = await request.json()
-    print("🔥 JSON recebido:", dados)  # LOG para verificar estrutura
+    print("🔥 JSON recebido:", dados)
 
     numero = dados.get("phone", "")
     msg = dados.get("text", {}).get("message", "").lower()
