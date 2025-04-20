@@ -6,20 +6,17 @@ import requests
 
 router = APIRouter()
 
-# 🔐 Dados da sua instância Z-API (nova versão v2)
+# ✅ Use o domínio funcional (v1)
 ZAPI_INSTANCE = "3DFEBC76D35C60755AF8FA8592F99CB9"
 ZAPI_TOKEN = "108648BD703ADBBBE798F920"
-ZAPI_URL = f"https://v2.z-api.io/instances/{ZAPI_INSTANCE}/send-message"
+ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/send-message"
 
 def enviar_whatsapp(numero: str, mensagem: str):
     print("📤 Enviando mensagem para", numero)
     resposta = requests.post(
         ZAPI_URL,
         headers={"Client-Token": ZAPI_TOKEN},
-        json={
-            "phone": numero,
-            "message": mensagem
-        }
+        json={"phone": numero, "message": mensagem}
     )
     print("📬 Resposta da Z-API:", resposta.status_code, resposta.text)
 
