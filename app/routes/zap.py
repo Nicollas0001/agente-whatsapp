@@ -6,21 +6,25 @@ import requests
 
 router = APIRouter()
 
-ZAPI_INSTANCE = "SEU_ID"
-ZAPI_TOKEN = "SEU_TOKEN"
-ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}"
+# 🔐 Dados reais da instância Z-API
+ZAPI_INSTANCE = "3DFEBC76D35C60755AF8FA8592F99CB9"
+ZAPI_TOKEN = "108648BD703ADBBBE798F920"
+ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/send-message"
 
 def enviar_whatsapp(numero: str, mensagem: str):
     print("📤 Enviando mensagem para", numero)
-    requests.post(
-        f"{ZAPI_URL}/send-message",
+    resposta = requests.post(
+        ZAPI_URL,
         headers={"Client-Token": ZAPI_TOKEN},
         json={"phone": numero, "message": mensagem}
     )
+    print("📬 Resposta da Z-API:", resposta.status_code, resposta.text)
 
-@router.post("/webhook")  # <- ESSENCIAL
+@router.post("/webhook")
 async def receber_msg(request: Request):
     dados = await request.json()
+    print("📥 JSON recebido:", dados)
+
     numero = dados.get("phone", "")
     msg = dados.get("text", {}).get("message", "").lower()
 
