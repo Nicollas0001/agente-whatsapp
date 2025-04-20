@@ -23,15 +23,18 @@ def enviar_whatsapp(numero: str, mensagem: str):
         "message": mensagem
     }
 
-    requests.post(
+    resposta = requests.post(
         f"{ZAPI_URL}/send-message",
         headers=headers,
         data=json.dumps(payload)
     )
+    print("📤 Resposta da Z-API:", resposta.status_code, resposta.text)
 
 @router.post("/webhook")
 async def receber_msg(request: Request):
     dados = await request.json()
+    print("🔥 JSON recebido:", dados)  # LOG para verificar estrutura
+
     numero = dados.get("phone", "")
     msg = dados.get("text", {}).get("message", "").lower()
     db = SessionLocal()
