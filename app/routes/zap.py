@@ -12,17 +12,26 @@ ZAPI_TOKEN = "108648BD703ADBBBE798F920"
 ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
-    requests.post(
-        f"{ZAPI_URL}/send-message",
-        json={
-            "phone": numero,
-            "message": mensagem
-        }
-    )
+    try:
+        response = requests.post(
+            f"{ZAPI_URL}/send-message",
+            json={
+                "phone": numero,
+                "message": mensagem
+            },
+            headers={
+                "Content-Type": "application/json"
+            },
+            timeout=5
+        )
+        print("Resposta da Z-API:", response.status_code, response.text)
+    except Exception as e:
+        print("Erro ao enviar mensagem:", e)
 
 @router.post("/webhook")
 async def receber_msg(request: Request):
     dados = await request.json()
+    print("Dados recebidos no webhook:", dados)
 
     numero = dados.get("phone", "")
     msg = dados.get("text", {}).get("message", "").lower()
