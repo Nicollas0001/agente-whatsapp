@@ -10,8 +10,7 @@ app.include_router(produtos.router, prefix="/produtos", tags=["Produtos"])
 app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
 app.include_router(vendas.router, prefix="/vendas", tags=["Vendas"])
 app.include_router(estoque.router, prefix="/estoque", tags=["Estoque"])
-app.include_router(zap.router, prefix="", tags=["WhatsApp"])
-
+app.include_router(zap.router, prefix="/zap", tags=["WhatsApp"])  # <- ESSENCIAL
 
 @app.get("/")
 def home():

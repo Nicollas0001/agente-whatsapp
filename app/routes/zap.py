@@ -6,31 +6,25 @@ import requests
 
 router = APIRouter()
 
-# 🔐 Z-API Config
-ZAPI_INSTANCE = "3DFEBC76D35C60755AF8FA8592F99CB9"
-ZAPI_TOKEN = "108648BD703ADBBBE798F920"
-ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
+ZAPI_INSTANCE = "SEU_ID"
+ZAPI_TOKEN = "SEU_TOKEN"
+ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
     print("📤 Enviando mensagem para", numero)
-    response = requests.post(
+    requests.post(
         f"{ZAPI_URL}/send-message",
-        json={
-            "phone": numero,
-            "message": mensagem
-        }
+        headers={"Client-Token": ZAPI_TOKEN},
+        json={"phone": numero, "message": mensagem}
     )
-    print("📥 Resposta da Z-API:", response.status_code, response.text)
 
-@router.post("/webhook")
+@router.post("/webhook")  # <- ESSENCIAL
 async def receber_msg(request: Request):
     dados = await request.json()
-    print("📩 JSON recebido:", dados)
-
     numero = dados.get("phone", "")
     msg = dados.get("text", {}).get("message", "").lower()
-    db = SessionLocal()
 
+    db = SessionLocal()
     resposta = "Olá! Digite o nome de um produto para consultar ou 'pix' para pagar."
 
     if "pix" in msg:
@@ -43,6 +37,5 @@ async def receber_msg(request: Request):
                 resposta = f"{p_mapping['nome']} custa R$ {p_mapping['preco']:.2f}"
                 break
 
-    print("✅ Vai enviar resposta automática...")
     enviar_whatsapp(numero, resposta)
     return {"status": "ok"}
