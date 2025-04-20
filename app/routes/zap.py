@@ -13,7 +13,7 @@ ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
 
 def enviar_whatsapp(numero: str, mensagem: str):
     response = requests.post(
-        f"{ZAPI_URL}/send-messages",  # ✅ Correção aqui (messages no plural)
+        f"{ZAPI_URL}/send-message",  # ✅ Correção aqui (messages no plural)
         json={
             "phone": numero,
             "message": mensagem
