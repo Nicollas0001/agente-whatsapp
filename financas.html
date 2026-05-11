@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Controle Financeiro</title>
+<style>
+:root {
+  --prim: #6C63FF;
+  --prim-dark: #5A52D5;
+  --receita: #06D6A0;
+  --despesa: #EF476F;
+  --aviso: #FFD166;
+  --fundo: #0F0F1A;
+  --sup: #1A1A2E;
+  --sup2: #252540;
+  --borda: #2E2E50;
+  --txt: #E9ECEF;
+  --txt2: #9A9ABF;
+  --sombra: 0 4px 16px rgba(0,0,0,0.4);
+  --raio: 14px;
+  --raio-sm: 8px;
+  --fonte: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --nav-h: 64px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--fonte);
+  background: var(--fundo);
+  color: var(--txt);
+  overflow-x: hidden;
+}
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── NAV ─────────────────────────────────────────────── */
+#nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  height: var(--nav-h);
+  background: var(--sup);
+  border-top: 1px solid var(--borda);
+  display: flex; align-items: stretch;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+}
+#nav a {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  text-decoration: none; color: var(--txt2);
+  font-size: 10px; font-weight: 500;
+  transition: color .2s;
+  padding: 6px 2px;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+#nav a .nav-ico { font-size: 20px; line-height: 1; }
+#nav a.ativo { color: var(--prim); }
+
+/* ── MAIN CONTENT ──────────────────────────────────────── */
+#conteudo {
+  flex: 1; overflow-y: auto;
+  padding: 16px 16px calc(var(--nav-h) + 16px);
+  max-width: 900px; margin: 0 auto; width: 100%;
+}
+
+/* ── CARDS ────────────────────────────────────────────── */
+.card {
+  background: var(--sup);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 16px;
+  box-shadow: var(--sombra);
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.card-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.card-resumo .card {
+  padding: 14px;
+  border-left: 4px solid var(--prim);
+}
+.card-resumo .card.c-receita { border-left-color: var(--receita); }
+.card-resumo .card.c-despesa { border-left-color: var(--despesa); }
+.card-resumo .card.c-saldo   { border-left-color: var(--aviso); }
+.card-label { font-size: 11px; color: var(--txt2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.card-valor { font-size: 22px; font-weight: 700; }
+.card-valor.pos { color: var(--receita); }
+.card-valor.neg { color: var(--despesa); }
+
+/* ── BARRA DE PROGRESSO ───────────────────────────────── */
+.barra-wrap { background: var(--borda); border-radius: 99px; height: 8px; overflow: hidden; margin: 8px 0; }
+.barra-fill { height: 100%; border-radius: 99px; transition: width .4s; }
+.barra-ok   { background: var(--receita); }
+.barra-med  { background: var(--aviso); }
+.barra-alto { background: var(--despesa); }
+
+/* ── BOTÕES ───────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 18px; border-radius: var(--raio-sm); border: none;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: opacity .2s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-prim { background: var(--prim); color: #fff; }
+.btn-prim:hover { background: var(--prim-dark); }
+.btn-ghost { background: transparent; color: var(--txt2); border: 1px solid var(--borda); }
+.btn-ghost:hover { color: var(--txt); border-color: var(--txt2); }
+.btn-perig { background: var(--despesa); color: #fff; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-icon { width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+
+/* FAB */
+#fab {
+  position: fixed; bottom: calc(var(--nav-h) + 16px); right: 16px; z-index: 99;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--prim); color: #fff; font-size: 26px;
+  border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(108,99,255,.5);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s, background .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+#fab:active { transform: scale(.92); }
+
+/* ── MODAL ────────────────────────────────────────────── */
+#modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 16px;
+}
+#modal-overlay.aberto { display: flex; }
+#modal-box {
+  background: var(--sup); border: 1px solid var(--borda);
+  border-radius: var(--raio); width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,.6);
+}
+#modal-header {
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--borda);
+  display: flex; align-items: center; justify-content: space-between;
+}
+#modal-titulo { font-size: 17px; font-weight: 700; }
+#modal-fechar {
+  background: none; border: none; color: var(--txt2); font-size: 22px;
+  cursor: pointer; line-height: 1; padding: 4px;
+}
+#modal-corpo { padding: 20px; }
+#modal-footer { padding: 14px 20px; border-top: 1px solid var(--borda); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── FORMS ────────────────────────────────────────────── */
+.form-grupo { margin-bottom: 16px; }
+.form-grupo label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--txt2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px;
+}
+.form-grupo input, .form-grupo select, .form-grupo textarea {
+  width: 100%; padding: 10px 12px;
+  background: var(--sup2); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); color: var(--txt);
+  font-family: var(--fonte); font-size: 14px;
+  transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.form-grupo input:focus, .form-grupo select:focus, .form-grupo textarea:focus {
+  outline: none; border-color: var(--prim);
+}
+.form-grupo select option { background: var(--sup2); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-erro { font-size: 11px; color: var(--despesa); margin-top: 4px; display: none; }
+.form-erro.vis { display: block; }
+
+/* ── LISTAS ───────────────────────────────────────────── */
+.lista-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--borda);
+}
+.lista-item:last-child { border-bottom: none; }
+.ico-cat {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.lista-info { flex: 1; min-width: 0; }
+.lista-titulo { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lista-sub { font-size: 12px; color: var(--txt2); margin-top: 2px; }
+.lista-valor { font-size: 15px; font-weight: 700; text-align: right; flex-shrink: 0; }
+.lista-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── BADGES ───────────────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-corrente { background: rgba(108,99,255,.2); color: var(--prim); }
+.badge-poupanca { background: rgba(6,214,160,.2); color: var(--receita); }
+.badge-investimento { background: rgba(255,209,102,.2); color: var(--aviso); }
+.badge-dinheiro { background: rgba(239,71,111,.2); color: var(--despesa); }
+
+/* ── SEÇÃO HEADER ─────────────────────────────────────── */
+.sec-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.sec-titulo { font-size: 20px; font-weight: 700; }
+
+/* ── MÊS NAV ──────────────────────────────────────────── */
+.mes-nav {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--sup); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); padding: 6px 10px;
+  margin-bottom: 18px;
+}
+.mes-nav button {
+  background: none; border: none; color: var(--txt2);
+  font-size: 18px; cursor: pointer; padding: 2px 6px;
+  border-radius: 6px; transition: background .15s;
+}
+.mes-nav button:hover { background: var(--sup2); }
+.mes-nome { flex: 1; text-align: center; font-weight: 600; font-size: 14px; }
+
+/* ── TABS ─────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; background: var(--sup2); border-radius: var(--raio-sm); padding: 4px; margin-bottom: 18px; }
+.tab-btn {
+  flex: 1; padding: 8px 4px; border: none; border-radius: 6px;
+  background: transparent; color: var(--txt2);
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.tab-btn.ativo { background: var(--prim); color: #fff; }
+
+/* ── FILTROS ──────────────────────────────────────────── */
+.filtros-wrap {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filtros-wrap select, .filtros-wrap input {
+  flex: 1; min-width: 100px;
+  padding: 8px 10px;
+  background: var(--sup); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); color: var(--txt);
+  font-family: var(--fonte); font-size: 13px;
+  -webkit-appearance: none;
+}
+.filtros-wrap select:focus, .filtros-wrap input:focus { outline: none; border-color: var(--prim); }
+
+/* ── EMPTY STATE ──────────────────────────────────────── */
+.vazio {
+  text-align: center; padding: 40px 20px; color: var(--txt2);
+}
+.vazio .vazio-ico { font-size: 48px; margin-bottom: 12px; }
+.vazio p { font-size: 14px; }
+
+/* ── TOAST ────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: calc(var(--nav-h) + 74px); left: 50%; transform: translateX(-50%);
+  background: var(--sup2); color: var(--txt); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); padding: 10px 20px; font-size: 13px; font-weight: 600;
+  z-index: 300; pointer-events: none;
+  opacity: 0; transition: opacity .25s;
+  white-space: nowrap;
+}
+#toast.vis { opacity: 1; }
+
+/* ── TELA ESCONDIDA ───────────────────────────────────── */
+.tela { display: none; }
+.tela.ativa { display: block; }
+
+/* ── SEPARADOR DATA ───────────────────────────────────── */
+.sep-data {
+  font-size: 11px; font-weight: 700; color: var(--txt2);
+  text-transform: uppercase; letter-spacing: .5px;
+  padding: 10px 0 6px; margin-top: 4px;
+}
+
+/* ── CHIP CATEGORIA ───────────────────────────────────── */
+.chip-cat {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+  background: rgba(108,99,255,.15); color: var(--prim);
+}
+
+/* ── CORES CARTÃO ─────────────────────────────────────── */
+.card-conta { border-top: 4px solid var(--prim); }
+
+/* ── TIPO BADGE ───────────────────────────────────────── */
+.tipo-pill {
+  display: inline-flex; gap: 4px;
+}
+.tipo-pill button {
+  flex: 1; padding: 8px; border: 2px solid var(--borda); border-radius: var(--raio-sm);
+  background: transparent; color: var(--txt2); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.tipo-pill button.sel-despesa  { border-color: var(--despesa);  background: rgba(239,71,111,.15);  color: var(--despesa);  }
+.tipo-pill button.sel-receita  { border-color: var(--receita);  background: rgba(6,214,160,.15);   color: var(--receita);  }
+.tipo-pill button.sel-transf   { border-color: var(--prim);     background: rgba(108,99,255,.15);  color: var(--prim);     }
+.tipo-pill button.sel-fatura   { border-color: var(--aviso);    background: rgba(255,209,102,.15); color: var(--aviso);    }
+
+/* ── COR SWATCH ───────────────────────────────────────── */
+.cor-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.cor-swatch {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  border: 3px solid transparent; transition: border-color .15s;
+}
+.cor-swatch.sel { border-color: #fff; }
+
+/* ── CATEGORIA PICKER ─────────────────────────────────── */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); gap: 8px; }
+.cat-opcao {
+  padding: 8px 4px; border-radius: var(--raio-sm);
+  border: 2px solid var(--borda); background: var(--sup2);
+  text-align: center; cursor: pointer; transition: all .15s;
+  font-size: 11px; font-weight: 600; color: var(--txt2);
+}
+.cat-opcao:hover { border-color: var(--prim); color: var(--prim); }
+.cat-opcao.sel { border-color: var(--prim); background: rgba(108,99,255,.15); color: var(--prim); }
+.cat-opcao .cat-ico { font-size: 20px; display: block; margin-bottom: 4px; }
+
+/* ── PARCELAS PREVIEW ─────────────────────────────────── */
+.parcela-info {
+  font-size: 12px; color: var(--txt2); margin-top: 6px;
+  padding: 8px; background: var(--sup2); border-radius: var(--raio-sm);
+}
+
+/* ── CANVAS CHART ─────────────────────────────────────── */
+.chart-wrap { position: relative; margin: 16px 0; }
+canvas { display: block; }
+
+/* ── RELATORIO LINHA ──────────────────────────────────── */
+.rel-linha {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--borda);
+}
+.rel-linha:last-child { border-bottom: none; }
+.rel-barra-wrap { flex: 1; background: var(--borda); height: 6px; border-radius: 99px; overflow: hidden; }
+.rel-barra { height: 100%; border-radius: 99px; }
+.rel-nome { width: 130px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rel-val { width: 90px; text-align: right; font-size: 13px; font-weight: 700; }
+.rel-pct { width: 38px; text-align: right; font-size: 11px; color: var(--txt2); }
+
+@media (min-width: 768px) {
+  #conteudo { padding: 24px 24px calc(var(--nav-h) + 16px); }
+  .card-resumo { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 480px) {
+  #nav a span:not(.nav-ico) { display: none; }
+  .form-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="conteudo">
+    <!-- Telas injetadas via JS -->
+    <section class="tela" id="tela-dashboard"></section>
+    <section class="tela" id="tela-contas"></section>
+    <section class="tela" id="tela-cartoes"></section>
+    <section class="tela" id="tela-lancamentos"></section>
+    <section class="tela" id="tela-relatorios"></section>
+    <section class="tela" id="tela-config"></section>
+  </main>
+
+  <nav id="nav">
+    <a href="#dashboard" data-tela="dashboard"><span class="nav-ico">🏠</span><span>Início</span></a>
+    <a href="#contas"    data-tela="contas">   <span class="nav-ico">🏦</span><span>Contas</span></a>
+    <a href="#cartoes"   data-tela="cartoes">  <span class="nav-ico">💳</span><span>Cartões</span></a>
+    <a href="#lancamentos" data-tela="lancamentos"><span class="nav-ico">📋</span><span>Lançamentos</span></a>
+    <a href="#relatorios" data-tela="relatorios"><span class="nav-ico">📊</span><span>Relatórios</span></a>
+    <a href="#config"    data-tela="config">   <span class="nav-ico">⚙️</span><span>Config</span></a>
+  </nav>
+
+  <button id="fab" title="Novo lançamento">＋</button>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div id="modal-header">
+      <span id="modal-titulo">Título</span>
+      <button id="modal-fechar">✕</button>
+    </div>
+    <div id="modal-corpo"></div>
+    <div id="modal-footer" style="display:none"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   STORAGE
+═══════════════════════════════════════════════════════════ */
+const Storage = {
+  _k: k => 'ff_' + k,
+  get(k) { try { return JSON.parse(localStorage.getItem(this._k(k))) ?? null; } catch { return null; } },
+  set(k, v) { localStorage.setItem(this._k(k), JSON.stringify(v)); },
+  contas()       { return this.get('contas')      || []; },
+  cartoes()      { return this.get('cartoes')     || []; },
+  transacoes()   { return this.get('transacoes')  || []; },
+  categorias()   { return this.get('categorias')  || []; },
+  config()       { return this.get('config')      || { temaEscuro: false }; },
+  salvarContas(v)      { this.set('contas', v);      },
+  salvarCartoes(v)     { this.set('cartoes', v);     },
+  salvarTransacoes(v)  { this.set('transacoes', v);  },
+  salvarCategorias(v)  { this.set('categorias', v);  },
+  salvarConfig(v)      { this.set('config', v);      },
+  exportar() {
+    return { contas: this.contas(), cartoes: this.cartoes(), transacoes: this.transacoes(),
+             categorias: this.categorias(), config: this.config(), exportadoEm: new Date().toISOString() };
+  },
+  importar(obj) {
+    if (!obj.contas || !obj.cartoes || !obj.transacoes || !obj.categorias) throw new Error('Arquivo inválido');
+    this.salvarContas(obj.contas); this.salvarCartoes(obj.cartoes);
+    this.salvarTransacoes(obj.transacoes); this.salvarCategorias(obj.categorias);
+    if (obj.config) this.salvarConfig(obj.config);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════════════ */
+const Utils = {
+  uuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  },
+  moeda(v) {
+    return (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  },
+  moedaSimples(v) {
+    return Math.abs(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  parseMoeda(s) {
+    if (typeof s === 'number') return s;
+    return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
+  },
+  dataHoje() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+  formatarData(iso) {
+    if (!iso) return '';
+    const [a,m,d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+  },
+  nomeMes(m, a) {
+    return new Date(a, m-1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  },
+  primeiroDia(m, a) { return new Date(a, m-1, 1); },
+  ultimoDia(m, a)   { return new Date(a, m, 0); },
+  datasNoMes(iso, m, a) {
+    const d = new Date(iso + 'T00:00:00');
+    return d >= this.primeiroDia(m, a) && d <= this.ultimoDia(m, a);
+  },
+  mesAtual() {
+    const d = new Date();
+    return { mes: d.getMonth() + 1, ano: d.getFullYear() };
+  },
+  addMes(m, a, delta) {
+    let nm = m + delta, na = a;
+    while (nm > 12) { nm -= 12; na++; }
+    while (nm < 1)  { nm += 12; na--; }
+    return { mes: nm, ano: na };
+  },
+  corTexto(hex) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return (r*299 + g*587 + b*114) / 1000 > 128 ? '#000' : '#fff';
+  },
+  esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SEED  (dados padrão na primeira execução)
+═══════════════════════════════════════════════════════════ */
+const CORES = ['#6C63FF','#06D6A0','#EF476F','#FFD166','#118AB2','#F77F00','#8338EC','#FF006E','#3A86FF','#FB5607'];
+const CATS_DESPESA = [
+  { nome:'Alimentação / Mercado', ico:'🛒' }, { nome:'Transporte / Combustível', ico:'🚗' },
+  { nome:'Lazer / Assinaturas',   ico:'🎮' }, { nome:'Jiu Jitsu',               ico:'🥋' },
+  { nome:'Cantina',               ico:'☕' }, { nome:'Energético',               ico:'⚡' },
+  { nome:'Conta de Água',         ico:'💧' }, { nome:'Aluguel',                  ico:'🏠' },
+  { nome:'Telefone',              ico:'📱' }, { nome:'Saúde / Farmácia',         ico:'💊' },
+  { nome:'Educação',              ico:'📚' }, { nome:'Outros',                   ico:'📦' },
+];
+const CATS_RECEITA = [
+  { nome:'Salário',      ico:'💰' }, { nome:'Freelance',      ico:'💻' },
+  { nome:'Investimentos',ico:'📈' }, { nome:'Outros (rec.)',  ico:'🎁' },
+];
+
+function seed() {
+  if (Storage.categorias().length > 0) return;
+  const cats = [
+    ...CATS_DESPESA.map((c,i) => ({ id: Utils.uuid(), nome: c.nome, ico: c.ico, cor: CORES[i % CORES.length], tipo:'despesa' })),
+    ...CATS_RECEITA.map((c,i) => ({ id: Utils.uuid(), nome: c.nome, ico: c.ico, cor: CORES[(i+4) % CORES.length], tipo:'receita' })),
+  ];
+  Storage.salvarCategorias(cats);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FINANCEIRO  (cálculos, nunca grava estado)
+═══════════════════════════════════════════════════════════ */
+const Fin = {
+  saldoConta(contaId) {
+    const conta = Storage.contas().find(c => c.id === contaId);
+    if (!conta) return 0;
+    let s = conta.saldoInicial || 0;
+    for (const t of Storage.transacoes()) {
+      if (t.tipo === 'receita'      && t.contaId === contaId) s += t.valor;
+      if (t.tipo === 'despesa'      && t.contaId === contaId) s -= t.valor;
+      if (t.tipo === 'fatura_cartao'&& t.contaId === contaId) s -= t.valor;
+      if (t.tipo === 'transferencia'&& t.contaId === contaId) s -= t.valor;
+      if (t.tipo === 'transferencia'&& t.contaDestinoId === contaId) s += t.valor;
+    }
+    return s;
+  },
+  saldoTotal() {
+    return Storage.contas().reduce((acc, c) => acc + this.saldoConta(c.id), 0);
+  },
+  periodoFatura(cartao, mes, ano) {
+    const fd = cartao.diaFechamento;
+    const ant = Utils.addMes(mes, ano, -1);
+    const ultimoDiaAnt = Utils.ultimoDia(ant.mes, ant.ano).getDate();
+    const diaIni = Math.min(fd, ultimoDiaAnt) + 1;
+    const inicio = new Date(ant.ano, ant.mes - 1, diaIni);
+    const ultimoDiaMes = Utils.ultimoDia(mes, ano).getDate();
+    const fim = new Date(ano, mes - 1, Math.min(fd, ultimoDiaMes));
+    const dv = cartao.diaVencimento;
+    const vencimento = new Date(ano, mes - 1, Math.min(dv, ultimoDiaMes));
+    return { inicio, fim, vencimento };
+  },
+  transacoesCartao(cartaoId, mes, ano) {
+    const cartao = Storage.cartoes().find(c => c.id === cartaoId);
+    if (!cartao) return [];
+    const { inicio, fim } = this.periodoFatura(cartao, mes, ano);
+    return Storage.transacoes().filter(t => {
+      if (t.cartaoId !== cartaoId) return false;
+      const d = new Date(t.data + 'T00:00:00');
+      return d >= inicio && d <= fim;
+    });
+  },
+  faturaCartao(cartaoId, mes, ano) {
+    return this.transacoesCartao(cartaoId, mes, ano).reduce((acc, t) => acc + t.valor, 0);
+  },
+  faturaAtual(cartaoId) {
+    const { mes, ano } = Utils.mesAtual();
+    return this.faturaCartao(cartaoId, mes, ano);
+  },
+  resumoMensal(mes, ano) {
+    let receitas = 0, despesas = 0;
+    for (const t of Storage.transacoes()) {
+      if (!Utils.datasNoMes(t.data, mes, ano)) continue;
+      if (t.tipo === 'receita') receitas += t.valor;
+      if (t.tipo === 'despesa') despesas += t.valor;
+    }
+    return { receitas, despesas, saldo: receitas - despesas };
+  },
+  despesasPorCategoria(mes, ano) {
+    const mapa = {};
+    for (const t of Storage.transacoes()) {
+      if (t.tipo !== 'despesa') continue;
+      if (!Utils.datasNoMes(t.data, mes, ano)) continue;
+      mapa[t.categoria] = (mapa[t.categoria] || 0) + t.valor;
+    }
+    const cats = Storage.categorias();
+    const total = Object.values(mapa).reduce((a,b)=>a+b, 0);
+    return Object.entries(mapa)
+      .map(([id, val]) => {
+        const c = cats.find(x => x.id === id) || { nome:'Outros', ico:'📦', cor:'#888' };
+        return { id, nome: c.nome, ico: c.ico, cor: c.cor, total: val, pct: total ? Math.round(val/total*100) : 0 };
+      })
+      .sort((a,b) => b.total - a.total);
+  },
+  receitasPorCategoria(mes, ano) {
+    const mapa = {};
+    for (const t of Storage.transacoes()) {
+      if (t.tipo !== 'receita') continue;
+      if (!Utils.datasNoMes(t.data, mes, ano)) continue;
+      mapa[t.categoria] = (mapa[t.categoria] || 0) + t.valor;
+    }
+    const cats = Storage.categorias();
+    const total = Object.values(mapa).reduce((a,b)=>a+b, 0);
+    return Object.entries(mapa)
+      .map(([id, val]) => {
+        const c = cats.find(x => x.id === id) || { nome:'Outros', ico:'🎁', cor:'#888' };
+        return { id, nome: c.nome, ico: c.ico, cor: c.cor, total: val, pct: total ? Math.round(val/total*100) : 0 };
+      })
+      .sort((a,b) => b.total - a.total);
+  },
+  evolucao(n) {
+    const res = [];
+    let { mes, ano } = Utils.mesAtual();
+    for (let i = n-1; i >= 0; i--) {
+      const ref = Utils.addMes(mes, ano, -i);
+      const r = this.resumoMensal(ref.mes, ref.ano);
+      res.push({ mes: ref.mes, ano: ref.ano, label: new Date(ref.ano, ref.mes-1, 1).toLocaleDateString('pt-BR',{month:'short'}), ...r });
+    }
+    return res;
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════ */
+let _toastTimer;
+function toast(msg, dur=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('vis');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('vis'), dur);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════════════ */
+const Modal = {
+  _ok: null,
+  abrir(titulo, html, { footer=true, ok='Salvar', okClass='btn-prim', onOk=null }={}) {
+    document.getElementById('modal-titulo').textContent = titulo;
+    document.getElementById('modal-corpo').innerHTML = html;
+    const ft = document.getElementById('modal-footer');
+    if (footer) {
+      ft.style.display = '';
+      ft.innerHTML = `<button class="btn btn-ghost" onclick="Modal.fechar()">Cancelar</button>
+                      <button class="btn ${okClass}" id="modal-ok-btn">${ok}</button>`;
+      this._ok = onOk;
+      document.getElementById('modal-ok-btn').onclick = () => { if (this._ok) this._ok(); };
+    } else {
+      ft.style.display = 'none';
+    }
+    document.getElementById('modal-overlay').classList.add('aberto');
+  },
+  fechar() {
+    document.getElementById('modal-overlay').classList.remove('aberto');
+    this._ok = null;
+  },
+  confirmar(msg, onSim) {
+    this.abrir('Confirmar', `<p style="font-size:15px;line-height:1.6">${Utils.esc(msg)}</p>`,
+      { ok:'Confirmar', okClass:'btn-perig', onOk: () => { this.fechar(); onSim(); } });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   GRÁFICOS  (Canvas 2D puro)
+═══════════════════════════════════════════════════════════ */
+const Graf = {
+  donut(canvasId, dados, total) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height, cx = W/2, cy = H/2, r = Math.min(cx,cy)*0.7, ri = r*0.55;
+    ctx.clearRect(0,0,W,H);
+    if (!dados.length) {
+      ctx.fillStyle = '#2E2E50'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#0F0F1A'; ctx.beginPath(); ctx.arc(cx,cy,ri,0,Math.PI*2); ctx.fill();
+      return;
+    }
+    let ang = -Math.PI/2;
+    for (const d of dados) {
+      const slice = (d.total / total) * Math.PI * 2;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,ang+slice); ctx.closePath();
+      ctx.fillStyle = d.cor; ctx.fill();
+      ang += slice;
+    }
+    ctx.fillStyle = '#0F0F1A'; ctx.beginPath(); ctx.arc(cx,cy,ri,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#E9ECEF'; ctx.font = `bold 14px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(Utils.moeda(total), cx, cy);
+  },
+  barras(canvasId, dados) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    ctx.clearRect(0,0,W,H);
+    if (!dados.length) return;
+    const pad = 30, barW = Math.max(10, (W - pad*2) / dados.length / 2 - 4);
+    const maxV = Math.max(...dados.map(d => Math.max(d.receitas, d.despesas)), 1);
+    const chartH = H - 40;
+    for (let i = 0; i < dados.length; i++) {
+      const x = pad + i * ((W - pad*2) / dados.length) + (W - pad*2) / dados.length / 2;
+      const rec = dados[i].receitas / maxV * chartH;
+      const des = dados[i].despesas / maxV * chartH;
+      ctx.fillStyle = '#06D6A0';
+      ctx.fillRect(x - barW - 2, chartH - rec + 4, barW, rec);
+      ctx.fillStyle = '#EF476F';
+      ctx.fillRect(x + 2, chartH - des + 4, barW, des);
+      ctx.fillStyle = '#9A9ABF'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(dados[i].label, x, H - 6);
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ROUTER
+═══════════════════════════════════════════════════════════ */
+const Router = {
+  telas: ['dashboard','contas','cartoes','lancamentos','relatorios','config'],
+  atual: null,
+  init() {
+    window.addEventListener('hashchange', () => this._navegar());
+    this._navegar();
+  },
+  _navegar() {
+    const hash = location.hash.replace('#','') || 'dashboard';
+    const tela = this.telas.includes(hash) ? hash : 'dashboard';
+    if (this.atual === tela) return;
+    this.atual = tela;
+    document.querySelectorAll('.tela').forEach(el => el.classList.remove('ativa'));
+    document.getElementById('tela-' + tela)?.classList.add('ativa');
+    document.querySelectorAll('#nav a').forEach(a => {
+      a.classList.toggle('ativo', a.dataset.tela === tela);
+    });
+    Telas[tela]?.render();
+    const fab = document.getElementById('fab');
+    fab.style.display = ['dashboard','lancamentos','contas','cartoes'].includes(tela) ? '' : 'none';
+  },
+  ir(tela) { location.hash = tela; }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: CONTAS
+═══════════════════════════════════════════════════════════ */
+const Telas = {};
+
+Telas.contas = {
+  render() {
+    const contas = Storage.contas();
+    const el = document.getElementById('tela-contas');
+    let html = `<div class="sec-header"><h1 class="sec-titulo">🏦 Contas</h1>
+      <button class="btn btn-prim btn-sm" onclick="Telas.contas.novo()">+ Nova</button></div>`;
+    if (!contas.length) {
+      html += `<div class="vazio"><div class="vazio-ico">🏦</div><p>Nenhuma conta ainda.<br>Adicione sua primeira conta!</p></div>`;
+    } else {
+      html += `<div class="card-grid">`;
+      const total = Fin.saldoTotal();
+      for (const c of contas) {
+        const saldo = Fin.saldoConta(c.id);
+        const pos = saldo >= 0;
+        const badgeClass = `badge-${c.tipo}`;
+        html += `<div class="card card-conta" style="border-top-color:${Utils.esc(c.cor)}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <div style="font-size:16px;font-weight:700">${Utils.esc(c.nome)}</div>
+              <div style="font-size:12px;color:var(--txt2)">${Utils.esc(c.banco)}</div>
+            </div>
+            <span class="badge ${badgeClass}">${c.tipo}</span>
+          </div>
+          <div class="card-valor ${pos?'pos':'neg'}">${Utils.moeda(saldo)}</div>
+          <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="Telas.contas.editar('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Telas.contas.excluir('${c.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+      html += `<div class="card" style="margin-top:16px;text-align:center">
+        <div class="card-label">Saldo Total</div>
+        <div class="card-valor ${total>=0?'pos':'neg'}" style="font-size:28px">${Utils.moeda(total)}</div>
+      </div>`;
+    }
+    el.innerHTML = html;
+  },
+  novo() { this._form(null); },
+  editar(id) { this._form(id); },
+  _form(id) {
+    const c = id ? Storage.contas().find(x=>x.id===id) : null;
+    const cores = CORES.map((cor,i) =>
+      `<div class="cor-swatch${c?.cor===cor||(!c&&i===0)?' sel':''}" style="background:${cor}" data-cor="${cor}" onclick="Telas.contas._selCor(this)"></div>`
+    ).join('');
+    const tipoOpts = ['corrente','poupança','investimento','dinheiro'].map(t =>
+      `<option value="${t}"${(c?.tipo||'corrente')===t?' selected':''}>${t}</option>`
+    ).join('');
+    Modal.abrir(id?'Editar Conta':'Nova Conta', `
+      <div class="form-grupo"><label>Nome da conta</label>
+        <input id="fc-nome" type="text" placeholder="Ex: Nubank Conta" value="${Utils.esc(c?.nome||'')}">
+        <div class="form-erro" id="fc-nome-err">Informe o nome</div></div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Banco</label>
+          <input id="fc-banco" type="text" placeholder="Ex: Nubank" value="${Utils.esc(c?.banco||'')}"></div>
+        <div class="form-grupo"><label>Tipo</label>
+          <select id="fc-tipo">${tipoOpts}</select></div>
+      </div>
+      <div class="form-grupo"><label>Saldo inicial (R$)</label>
+        <input id="fc-saldo" type="number" step="0.01" placeholder="0,00" value="${c?.saldoInicial??0}">
+        <div style="font-size:11px;color:var(--txt2);margin-top:4px">Use o saldo atual se for a primeira vez que cadastra.</div></div>
+      <div class="form-grupo"><label>Cor</label><div class="cor-grid">${cores}</div></div>
+    `, { onOk: () => this._salvar(id) });
+  },
+  _selCor(el) {
+    document.querySelectorAll('#modal-corpo .cor-swatch').forEach(e=>e.classList.remove('sel'));
+    el.classList.add('sel');
+  },
+  _salvar(id) {
+    const nome = document.getElementById('fc-nome').value.trim();
+    if (!nome) { document.getElementById('fc-nome-err').classList.add('vis'); return; }
+    document.getElementById('fc-nome-err').classList.remove('vis');
+    const cor = document.querySelector('#modal-corpo .cor-swatch.sel')?.dataset.cor || CORES[0];
+    const obj = {
+      id: id || Utils.uuid(),
+      nome, banco: document.getElementById('fc-banco').value.trim(),
+      tipo: document.getElementById('fc-tipo').value,
+      saldoInicial: parseFloat(document.getElementById('fc-saldo').value) || 0,
+      cor, criadaEm: id ? (Storage.contas().find(x=>x.id===id)?.criadaEm || new Date().toISOString()) : new Date().toISOString()
+    };
+    const arr = Storage.contas();
+    if (id) { const i = arr.findIndex(x=>x.id===id); arr[i] = obj; }
+    else arr.push(obj);
+    Storage.salvarContas(arr);
+    Modal.fechar(); this.render(); toast(id?'Conta atualizada!':'Conta criada!');
+  },
+  excluir(id) {
+    Modal.confirmar('Excluir esta conta? Todas as transações vinculadas serão mantidas.', () => {
+      Storage.salvarContas(Storage.contas().filter(c=>c.id!==id));
+      this.render(); toast('Conta excluída.');
+    });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: CARTÕES
+═══════════════════════════════════════════════════════════ */
+Telas.cartoes = {
+  render() {
+    const cartoes = Storage.cartoes();
+    const el = document.getElementById('tela-cartoes');
+    let html = `<div class="sec-header"><h1 class="sec-titulo">💳 Cartões</h1>
+      <button class="btn btn-prim btn-sm" onclick="Telas.cartoes.novo()">+ Novo</button></div>`;
+    if (!cartoes.length) {
+      html += `<div class="vazio"><div class="vazio-ico">💳</div><p>Nenhum cartão ainda.</p></div>`;
+    } else {
+      html += `<div class="card-grid">`;
+      const { mes, ano } = Utils.mesAtual();
+      for (const c of cartoes) {
+        const fatura = Fin.faturaCartao(c.id, mes, ano);
+        const disp = c.limite - fatura;
+        const pct = c.limite ? Math.min(100, Math.round(fatura/c.limite*100)) : 0;
+        const cls = pct < 70 ? 'barra-ok' : pct < 90 ? 'barra-med' : 'barra-alto';
+        html += `<div class="card" style="border-top:4px solid ${Utils.esc(c.cor)}">
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <div><div style="font-size:16px;font-weight:700">${Utils.esc(c.nome)}</div>
+              <div style="font-size:12px;color:var(--txt2)">${Utils.esc(c.banco)}</div></div>
+            <div style="text-align:right;font-size:11px;color:var(--txt2)">
+              Fecha dia ${c.diaFechamento}<br>Vence dia ${c.diaVencimento}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txt2);margin-bottom:4px">
+            <span>Fatura: <strong style="color:var(--txt)">${Utils.moeda(fatura)}</strong></span>
+            <span>Limite: ${Utils.moeda(c.limite)}</span>
+          </div>
+          <div class="barra-wrap"><div class="barra-fill ${cls}" style="width:${pct}%"></div></div>
+          <div style="font-size:12px;color:var(--txt2);margin-bottom:14px">Disponível: <strong style="color:var(--receita)">${Utils.moeda(disp)}</strong></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="Telas.cartoes.editar('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Telas.cartoes.excluir('${c.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+  },
+  novo() { this._form(null); },
+  editar(id) { this._form(id); },
+  _form(id) {
+    const c = id ? Storage.cartoes().find(x=>x.id===id) : null;
+    const cores = CORES.map((cor,i) =>
+      `<div class="cor-swatch${c?.cor===cor||(!c&&i===3)?' sel':''}" style="background:${cor}" data-cor="${cor}" onclick="Telas.cartoes._selCor(this)"></div>`
+    ).join('');
+    Modal.abrir(id?'Editar Cartão':'Novo Cartão', `
+      <div class="form-grupo"><label>Nome do cartão</label>
+        <input id="ct-nome" type="text" placeholder="Ex: Nubank Crédito" value="${Utils.esc(c?.nome||'')}">
+        <div class="form-erro" id="ct-nome-err">Informe o nome</div></div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Banco</label>
+          <input id="ct-banco" type="text" placeholder="Ex: Nubank" value="${Utils.esc(c?.banco||'')}"></div>
+        <div class="form-grupo"><label>Limite (R$)</label>
+          <input id="ct-limite" type="number" step="0.01" placeholder="0,00" value="${c?.limite??''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Dia de fechamento</label>
+          <input id="ct-fecha" type="number" min="1" max="31" placeholder="Ex: 15" value="${c?.diaFechamento??''}"></div>
+        <div class="form-grupo"><label>Dia de vencimento</label>
+          <input id="ct-vence" type="number" min="1" max="31" placeholder="Ex: 22" value="${c?.diaVencimento??''}"></div>
+      </div>
+      <div class="form-grupo"><label>Cor</label><div class="cor-grid">${cores}</div></div>
+    `, { onOk: () => this._salvar(id) });
+  },
+  _selCor(el) {
+    document.querySelectorAll('#modal-corpo .cor-swatch').forEach(e=>e.classList.remove('sel'));
+    el.classList.add('sel');
+  },
+  _salvar(id) {
+    const nome = document.getElementById('ct-nome').value.trim();
+    if (!nome) { document.getElementById('ct-nome-err').classList.add('vis'); return; }
+    document.getElementById('ct-nome-err').classList.remove('vis');
+    const cor = document.querySelector('#modal-corpo .cor-swatch.sel')?.dataset.cor || CORES[3];
+    const obj = {
+      id: id || Utils.uuid(),
+      nome, banco: document.getElementById('ct-banco').value.trim(),
+      limite: parseFloat(document.getElementById('ct-limite').value) || 0,
+      diaFechamento: parseInt(document.getElementById('ct-fecha').value) || 1,
+      diaVencimento: parseInt(document.getElementById('ct-vence').value) || 10,
+      cor, criadaEm: id ? (Storage.cartoes().find(x=>x.id===id)?.criadaEm || new Date().toISOString()) : new Date().toISOString()
+    };
+    const arr = Storage.cartoes();
+    if (id) { const i = arr.findIndex(x=>x.id===id); arr[i] = obj; }
+    else arr.push(obj);
+    Storage.salvarCartoes(arr);
+    Modal.fechar(); this.render(); toast(id?'Cartão atualizado!':'Cartão criado!');
+  },
+  excluir(id) {
+    Modal.confirmar('Excluir este cartão?', () => {
+      Storage.salvarCartoes(Storage.cartoes().filter(c=>c.id!==id));
+      this.render(); toast('Cartão excluído.');
+    });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: LANÇAMENTOS
+═══════════════════════════════════════════════════════════ */
+Telas.lancamentos = {
+  _filtros: { ...Utils.mesAtual(), tipo:'todos', contaId:'', cartaoId:'', catId:'', busca:'' },
+  render() {
+    const f = this._filtros;
+    const contas  = Storage.contas();
+    const cartoes = Storage.cartoes();
+    const cats    = Storage.categorias();
+    const contaOpts = [`<option value="">Todas as contas</option>`,
+      ...contas.map(c=>`<option value="${c.id}"${f.contaId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
+    const cartOpts = [`<option value="">Todos os cartões</option>`,
+      ...cartoes.map(c=>`<option value="${c.id}"${f.cartaoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
+    const el = document.getElementById('tela-lancamentos');
+    el.innerHTML = `
+      <div class="sec-header"><h1 class="sec-titulo">📋 Lançamentos</h1></div>
+      <div class="mes-nav">
+        <button onclick="Telas.lancamentos._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(f.mes,f.ano)}</span>
+        <button onclick="Telas.lancamentos._mudarMes(1)">▶</button>
+      </div>
+      <div class="filtros-wrap">
+        <select onchange="Telas.lancamentos._filtros.tipo=this.value;Telas.lancamentos._renderLista()">
+          <option value="todos">Todos os tipos</option>
+          <option value="receita"${f.tipo==='receita'?' selected':''}>Receitas</option>
+          <option value="despesa"${f.tipo==='despesa'?' selected':''}>Despesas</option>
+          <option value="transferencia"${f.tipo==='transferencia'?' selected':''}>Transferências</option>
+          <option value="fatura_cartao"${f.tipo==='fatura_cartao'?' selected':''}>Pag. Fatura</option>
+        </select>
+        <select onchange="Telas.lancamentos._filtros.contaId=this.value;Telas.lancamentos._renderLista()">${contaOpts}</select>
+        <select onchange="Telas.lancamentos._filtros.cartaoId=this.value;Telas.lancamentos._renderLista()">${cartOpts}</select>
+      </div>
+      <input type="search" placeholder="🔍 Buscar descrição..." style="width:100%;padding:9px 12px;background:var(--sup);border:1px solid var(--borda);border-radius:var(--raio-sm);color:var(--txt);font-family:var(--fonte);font-size:13px;margin-bottom:14px"
+        value="${Utils.esc(f.busca)}" oninput="Telas.lancamentos._filtros.busca=this.value;Telas.lancamentos._renderLista()">
+      <div id="lista-lancamentos"></div>`;
+    this._renderLista();
+  },
+  _mudarMes(d) {
+    const n = Utils.addMes(this._filtros.mes, this._filtros.ano, d);
+    this._filtros.mes = n.mes; this._filtros.ano = n.ano;
+    this.render();
+  },
+  _renderLista() {
+    const f = this._filtros;
+    let txs = Storage.transacoes().filter(t => {
+      if (!Utils.datasNoMes(t.data, f.mes, f.ano)) return false;
+      if (f.tipo !== 'todos' && t.tipo !== f.tipo) return false;
+      if (f.contaId && t.contaId !== f.contaId && t.contaDestinoId !== f.contaId) return false;
+      if (f.cartaoId && t.cartaoId !== f.cartaoId) return false;
+      if (f.busca && !t.descricao.toLowerCase().includes(f.busca.toLowerCase())) return false;
+      return true;
+    });
+    txs.sort((a,b) => b.data.localeCompare(a.data));
+    const el = document.getElementById('lista-lancamentos');
+    if (!txs.length) {
+      el.innerHTML = `<div class="vazio"><div class="vazio-ico">📭</div><p>Nenhum lançamento encontrado.</p></div>`;
+      return;
+    }
+    const cats   = Storage.categorias();
+    const contas = Storage.contas();
+    const carts  = Storage.cartoes();
+    let html = '', dataAtual = '';
+    for (const t of txs) {
+      if (t.data !== dataAtual) {
+        dataAtual = t.data;
+        html += `<div class="sep-data">${Utils.formatarData(t.data)}</div>`;
+      }
+      const cat = cats.find(c=>c.id===t.categoria);
+      const conta = contas.find(c=>c.id===t.contaId);
+      const cart  = carts.find(c=>c.id===t.cartaoId);
+      const dest  = contas.find(c=>c.id===t.contaDestinoId);
+      let subTxt = '';
+      if (t.tipo==='transferencia') subTxt = `${conta?.nome||'?'} → ${dest?.nome||'?'}`;
+      else if (t.cartaoId) subTxt = cart?.nome || '?';
+      else subTxt = conta?.nome || '';
+      if (t.parcelas > 1) subTxt += ` (${t.parcelaAtual}/${t.parcelas}x)`;
+      const cor = t.tipo==='receita'?'var(--receita)':t.tipo==='despesa'?'var(--despesa)':'var(--txt2)';
+      const sinal = t.tipo==='receita'?'+':t.tipo==='despesa'?'-':'';
+      html += `<div class="lista-item">
+        <div class="ico-cat" style="background:${Utils.esc((cat?.cor||'#444')+'22')}"> ${cat?.ico||'📦'}</div>
+        <div class="lista-info">
+          <div class="lista-titulo">${Utils.esc(t.descricao)}</div>
+          <div class="lista-sub">${cat?`<span class="chip-cat">${cat.ico} ${Utils.esc(cat.nome)}</span> `:''} ${Utils.esc(subTxt)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="lista-valor" style="color:${cor}">${sinal}${Utils.moeda(t.valor)}</div>
+        </div>
+        <div class="lista-acoes">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.lancamentos.editar('${t.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.lancamentos.excluir('${t.id}','${t.parcelaGrupoId||''}')">🗑️</button>
+        </div>
+      </div>`;
+    }
+    el.innerHTML = html;
+  },
+  novo(tipo) { this._form(null, tipo); },
+  editar(id) { this._form(id); },
+  _form(id, tipoInit) {
+    const tx = id ? Storage.transacoes().find(x=>x.id===id) : null;
+    const tipo = tx?.tipo || tipoInit || 'despesa';
+    const contas  = Storage.contas();
+    const cartoes = Storage.cartoes();
+    const cats    = Storage.categorias();
+    const contaOpts = contas.map(c=>`<option value="${c.id}"${tx?.contaId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`).join('');
+    const contaDestOpts = contas.map(c=>`<option value="${c.id}"${tx?.contaDestinoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`).join('');
+    const cartOpts = cartoes.map(c=>`<option value="${c.id}"${tx?.cartaoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`).join('');
+    const catsDespOpts = cats.filter(c=>c.tipo!=='receita').map(c=>`<option value="${c.id}"${tx?.categoria===c.id?' selected':''}>${c.ico} ${Utils.esc(c.nome)}</option>`).join('');
+    const catsRecOpts  = cats.filter(c=>c.tipo!=='despesa').map(c=>`<option value="${c.id}"${tx?.categoria===c.id?' selected':''}>${c.ico} ${Utils.esc(c.nome)}</option>`).join('');
+    const tipoSel = (t) => tipo===t?'sel-'+t:'';
+    Modal.abrir(id?'Editar Lançamento':'Novo Lançamento', `
+      <div class="form-grupo"><label>Tipo</label>
+        <div class="tipo-pill" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px" id="tipo-pill">
+          <button type="button" data-tipo="despesa"  class="${tipoSel('despesa')}"  onclick="Telas.lancamentos._seltipo(this)">💸 Despesa</button>
+          <button type="button" data-tipo="receita"  class="${tipoSel('receita')}"  onclick="Telas.lancamentos._seltipo(this)">💰 Receita</button>
+          <button type="button" data-tipo="transferencia" class="${tipoSel('transferencia')}" onclick="Telas.lancamentos._seltipo(this)">🔀 Transf.</button>
+          <button type="button" data-tipo="fatura_cartao" class="${tipoSel('fatura_cartao')}" onclick="Telas.lancamentos._seltipo(this)">💳 Fatura</button>
+        </div></div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Data</label>
+          <input id="tx-data" type="date" value="${tx?.data||Utils.dataHoje()}"></div>
+        <div class="form-grupo"><label>Valor (R$)</label>
+          <input id="tx-valor" type="number" step="0.01" min="0.01" placeholder="0,00" value="${tx?.valor||''}">
+          <div class="form-erro" id="tx-valor-err">Informe o valor</div></div>
+      </div>
+      <div class="form-grupo"><label>Descrição</label>
+        <input id="tx-desc" type="text" placeholder="Ex: Supermercado" value="${Utils.esc(tx?.descricao||'')}">
+        <div class="form-erro" id="tx-desc-err">Informe a descrição</div></div>
+
+      <div id="campos-despesa" style="display:${tipo==='despesa'?'':'none'}">
+        <div class="form-grupo"><label>Categoria</label>
+          <select id="tx-cat-desp">${catsDespOpts}</select></div>
+        <div class="form-grupo"><label>Conta</label>
+          <select id="tx-conta-desp"><option value="">Nenhuma (só cartão)</option>${contaOpts}</select></div>
+        <div class="form-grupo"><label>Cartão (opcional)</label>
+          <select id="tx-cart-desp"><option value="">Nenhum</option>${cartOpts}</select></div>
+        <div class="form-row">
+          <div class="form-grupo"><label>Parcelas</label>
+            <input id="tx-parc" type="number" min="1" max="48" value="${tx?.parcelas||1}" oninput="Telas.lancamentos._updParc(this.value)"></div>
+          <div class="form-grupo"><label>&nbsp;</label>
+            <div class="parcela-info" id="parc-info"></div></div>
+        </div>
+      </div>
+
+      <div id="campos-receita" style="display:${tipo==='receita'?'':'none'}">
+        <div class="form-grupo"><label>Categoria</label>
+          <select id="tx-cat-rec">${catsRecOpts}</select></div>
+        <div class="form-grupo"><label>Conta</label>
+          <select id="tx-conta-rec">${contaOpts}</select></div>
+      </div>
+
+      <div id="campos-transf" style="display:${tipo==='transferencia'?'':'none'}">
+        <div class="form-grupo"><label>Conta origem</label>
+          <select id="tx-orig">${contaOpts}</select></div>
+        <div class="form-grupo"><label>Conta destino</label>
+          <select id="tx-dest">${contaDestOpts}</select></div>
+      </div>
+
+      <div id="campos-fatura" style="display:${tipo==='fatura_cartao'?'':'none'}">
+        <div class="form-grupo"><label>Cartão pago</label>
+          <select id="tx-cart-fat"><option value="">Selecione</option>${cartOpts}</select></div>
+        <div class="form-grupo"><label>Conta debitada</label>
+          <select id="tx-conta-fat">${contaOpts}</select></div>
+      </div>
+    `, { onOk: () => this._salvar(id) });
+    this._updParc(tx?.parcelas||1);
+  },
+  _seltipo(btn) {
+    const tipo = btn.dataset.tipo;
+    document.querySelectorAll('#tipo-pill button').forEach(b => {
+      b.className = b.dataset.tipo === tipo ? 'sel-'+tipo : '';
+    });
+    ['despesa','receita','transferencia','fatura_cartao'].forEach(t =>
+      document.getElementById('campos-'+t).style.display = tipo===t?'':'none'
+    );
+    // corrige nome dos campos ocultos
+    document.getElementById('campos-fatura').style.display = tipo==='fatura_cartao'?'':'none';
+  },
+  _updParc(n) {
+    const info = document.getElementById('parc-info');
+    if (!info) return;
+    const v = parseFloat(document.getElementById('tx-valor')?.value) || 0;
+    const p = parseInt(n) || 1;
+    if (p <= 1) { info.textContent = 'À vista'; return; }
+    const cada = v / p;
+    info.innerHTML = `${p}x de ${Utils.moeda(cada)}`;
+  },
+  _getTipoSel() {
+    const sel = document.querySelector('#tipo-pill button[class^="sel-"]');
+    return sel?.dataset.tipo || 'despesa';
+  },
+  _salvar(id) {
+    const tipo  = this._getTipoSel();
+    const valor = parseFloat(document.getElementById('tx-valor').value) || 0;
+    const desc  = document.getElementById('tx-desc').value.trim();
+    let valido = true;
+    if (!valor || valor <= 0) { document.getElementById('tx-valor-err').classList.add('vis'); valido = false; }
+    else document.getElementById('tx-valor-err').classList.remove('vis');
+    if (!desc) { document.getElementById('tx-desc-err').classList.add('vis'); valido = false; }
+    else document.getElementById('tx-desc-err').classList.remove('vis');
+    if (!valido) return;
+    const data = document.getElementById('tx-data').value || Utils.dataHoje();
+    const arr = Storage.transacoes();
+    if (id) {
+      const tx = arr.find(x=>x.id===id);
+      if (tx) {
+        tx.data = data; tx.descricao = desc; tx.valor = valor; tx.tipo = tipo;
+        if (tipo==='despesa') {
+          tx.categoria = document.getElementById('tx-cat-desp').value;
+          tx.contaId   = document.getElementById('tx-conta-desp').value || null;
+          tx.cartaoId  = document.getElementById('tx-cart-desp').value || null;
+          tx.contaDestinoId = null;
+        } else if (tipo==='receita') {
+          tx.categoria = document.getElementById('tx-cat-rec').value;
+          tx.contaId   = document.getElementById('tx-conta-rec').value || null;
+          tx.cartaoId  = null; tx.contaDestinoId = null;
+        } else if (tipo==='transferencia') {
+          tx.contaId  = document.getElementById('tx-orig').value || null;
+          tx.contaDestinoId = document.getElementById('tx-dest').value || null;
+          tx.cartaoId = null; tx.categoria = null;
+        } else {
+          tx.cartaoId = document.getElementById('tx-cart-fat').value || null;
+          tx.contaId  = document.getElementById('tx-conta-fat').value || null;
+          tx.contaDestinoId = null; tx.categoria = null;
+        }
+      }
+      Storage.salvarTransacoes(arr);
+      Modal.fechar(); this._renderLista(); toast('Lançamento atualizado!');
+      return;
+    }
+    // Novo lançamento
+    const parcelas = tipo==='despesa' ? (parseInt(document.getElementById('tx-parc').value)||1) : 1;
+    const grupoId  = parcelas > 1 ? Utils.uuid() : null;
+    for (let p = 1; p <= parcelas; p++) {
+      const [a,m,d2] = data.split('-').map(Number);
+      const nd = Utils.addMes(m, a, p-1);
+      const dataParc = `${nd.ano}-${String(nd.mes).padStart(2,'0')}-${String(d2).padStart(2,'0')}`;
+      const tx = {
+        id: Utils.uuid(), data: dataParc, descricao: desc,
+        valor: parseFloat((valor/parcelas).toFixed(2)), tipo,
+        parcelas, parcelaAtual: p, parcelaGrupoId: grupoId,
+        categoria: null, contaId: null, cartaoId: null, contaDestinoId: null
+      };
+      if (tipo==='despesa') {
+        tx.categoria = document.getElementById('tx-cat-desp').value;
+        tx.contaId   = document.getElementById('tx-conta-desp').value || null;
+        tx.cartaoId  = document.getElementById('tx-cart-desp').value || null;
+      } else if (tipo==='receita') {
+        tx.categoria = document.getElementById('tx-cat-rec').value;
+        tx.contaId   = document.getElementById('tx-conta-rec').value || null;
+      } else if (tipo==='transferencia') {
+        tx.contaId  = document.getElementById('tx-orig').value || null;
+        tx.contaDestinoId = document.getElementById('tx-dest').value || null;
+      } else {
+        tx.cartaoId = document.getElementById('tx-cart-fat').value || null;
+        tx.contaId  = document.getElementById('tx-conta-fat').value || null;
+      }
+      arr.push(tx);
+    }
+    Storage.salvarTransacoes(arr);
+    Modal.fechar(); this._renderLista();
+    toast(parcelas>1 ? `${parcelas} parcelas criadas!` : 'Lançamento salvo!');
+  },
+  excluir(id, grupoId) {
+    if (grupoId) {
+      const arr = Storage.transacoes();
+      const qtd = arr.filter(t=>t.parcelaGrupoId===grupoId).length;
+      if (qtd > 1) {
+        Modal.abrir('Excluir parcela', `<p style="font-size:14px;line-height:1.7">Esta compra tem ${qtd} parcelas.<br>Deseja excluir:</p>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+            <button class="btn btn-ghost" onclick="Telas.lancamentos._excluirUm('${id}')">Somente esta parcela</button>
+            <button class="btn btn-perig" onclick="Telas.lancamentos._excluirGrupo('${grupoId}')">Todas as ${qtd} parcelas</button>
+          </div>`, { footer: false });
+        return;
+      }
+    }
+    Modal.confirmar('Excluir este lançamento?', () => {
+      Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
+      this._renderLista(); toast('Lançamento excluído.');
+    });
+  },
+  _excluirUm(id) {
+    Modal.fechar();
+    Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
+    this._renderLista(); toast('Parcela excluída.');
+  },
+  _excluirGrupo(grupoId) {
+    Modal.fechar();
+    Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.parcelaGrupoId!==grupoId));
+    this._renderLista(); toast('Parcelas excluídas.');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: DASHBOARD
+═══════════════════════════════════════════════════════════ */
+Telas.dashboard = {
+  _ref: Utils.mesAtual(),
+  render() {
+    const { mes, ano } = this._ref;
+    const resumo  = Fin.resumoMensal(mes, ano);
+    const total   = Fin.saldoTotal();
+    const cartoes = Storage.cartoes();
+    const cats    = Fin.despesasPorCategoria(mes, ano);
+    const txs     = Storage.transacoes()
+      .filter(t => Utils.datasNoMes(t.data, mes, ano))
+      .sort((a,b) => b.data.localeCompare(a.data))
+      .slice(0, 10);
+    const allCats = Storage.categorias();
+    const contas  = Storage.contas();
+    const carts   = Storage.cartoes();
+    let cartoesHtml = '';
+    if (cartoes.length) {
+      cartoesHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Faturas dos Cartões</h2><div class="card-grid">`;
+      for (const c of cartoes) {
+        const fat = Fin.faturaCartao(c.id, mes, ano);
+        const pct = c.limite ? Math.min(100,Math.round(fat/c.limite*100)) : 0;
+        const cls = pct<70?'barra-ok':pct<90?'barra-med':'barra-alto';
+        cartoesHtml += `<div class="card" style="border-left:4px solid ${Utils.esc(c.cor)}">
+          <div style="font-weight:700;margin-bottom:8px">${Utils.esc(c.nome)}</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span>Fatura</span><strong>${Utils.moeda(fat)}</strong></div>
+          <div class="barra-wrap"><div class="barra-fill ${cls}" style="width:${pct}%"></div></div>
+          <div style="font-size:12px;color:var(--txt2)">Disponível: ${Utils.moeda(c.limite-fat)}</div>
+        </div>`;
+      }
+      cartoesHtml += `</div>`;
+    }
+    let recTxHtml = '';
+    if (txs.length) {
+      recTxHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Últimos Lançamentos</h2><div class="card">`;
+      let dataAtual = '';
+      for (const t of txs) {
+        if (t.data !== dataAtual) { dataAtual = t.data; recTxHtml += `<div class="sep-data">${Utils.formatarData(t.data)}</div>`; }
+        const cat   = allCats.find(c=>c.id===t.categoria);
+        const conta = contas.find(c=>c.id===t.contaId);
+        const cart  = carts.find(c=>c.id===t.cartaoId);
+        const cor = t.tipo==='receita'?'var(--receita)':t.tipo==='despesa'?'var(--despesa)':'var(--txt2)';
+        const sinal = t.tipo==='receita'?'+':t.tipo==='despesa'?'-':'';
+        recTxHtml += `<div class="lista-item">
+          <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'}">${cat?.ico||'📦'}</div>
+          <div class="lista-info">
+            <div class="lista-titulo">${Utils.esc(t.descricao)}</div>
+            <div class="lista-sub">${Utils.esc(cart?.nome||conta?.nome||'')}</div>
+          </div>
+          <div class="lista-valor" style="color:${cor}">${sinal}${Utils.moeda(t.valor)}</div>
+        </div>`;
+      }
+      recTxHtml += `</div>`;
+    }
+    const totalCatDep = cats.reduce((a,c)=>a+c.total,0);
+    const el = document.getElementById('tela-dashboard');
+    el.innerHTML = `
+      <div class="mes-nav">
+        <button onclick="Telas.dashboard._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
+        <button onclick="Telas.dashboard._mudarMes(1)">▶</button>
+      </div>
+      <div class="card-resumo">
+        <div class="card"><div class="card-label">Saldo Total</div>
+          <div class="card-valor ${total>=0?'pos':'neg'}">${Utils.moeda(total)}</div></div>
+        <div class="card c-receita"><div class="card-label">Receitas</div>
+          <div class="card-valor pos">${Utils.moeda(resumo.receitas)}</div></div>
+        <div class="card c-despesa"><div class="card-label">Despesas</div>
+          <div class="card-valor neg">${Utils.moeda(resumo.despesas)}</div></div>
+        <div class="card c-saldo"><div class="card-label">Saldo do Mês</div>
+          <div class="card-valor ${resumo.saldo>=0?'pos':'neg'}">${Utils.moeda(resumo.saldo)}</div></div>
+      </div>
+      ${cartoesHtml}
+      ${cats.length ? `
+        <h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Gastos por Categoria</h2>
+        <div class="card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <canvas id="cv-donut" width="160" height="160"></canvas>
+          <div style="flex:1;min-width:160px">
+            ${cats.slice(0,6).map(c=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div style="width:10px;height:10px;border-radius:50%;background:${c.cor};flex-shrink:0"></div>
+              <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ico} ${Utils.esc(c.nome)}</div>
+              <div style="font-size:12px;font-weight:700;color:var(--despesa)">${Utils.moeda(c.total)}</div>
+            </div>`).join('')}
+          </div>
+        </div>` : ''}
+      ${recTxHtml}`;
+    if (cats.length) Graf.donut('cv-donut', cats, totalCatDep);
+  },
+  _mudarMes(d) {
+    this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d);
+    this.render();
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: RELATÓRIOS
+═══════════════════════════════════════════════════════════ */
+Telas.relatorios = {
+  _ref: Utils.mesAtual(),
+  _aba: 'resumo',
+  render() {
+    const el = document.getElementById('tela-relatorios');
+    el.innerHTML = `
+      <div class="sec-header"><h1 class="sec-titulo">📊 Relatórios</h1></div>
+      <div class="mes-nav">
+        <button onclick="Telas.relatorios._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(this._ref.mes,this._ref.ano)}</span>
+        <button onclick="Telas.relatorios._mudarMes(1)">▶</button>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn${this._aba==='resumo'?' ativo':''}" onclick="Telas.relatorios._aba='resumo';Telas.relatorios._renderAba()">Resumo</button>
+        <button class="tab-btn${this._aba==='categoria'?' ativo':''}" onclick="Telas.relatorios._aba='categoria';Telas.relatorios._renderAba()">Categorias</button>
+        <button class="tab-btn${this._aba==='faturas'?' ativo':''}" onclick="Telas.relatorios._aba='faturas';Telas.relatorios._renderAba()">Faturas</button>
+        <button class="tab-btn${this._aba==='evolucao'?' ativo':''}" onclick="Telas.relatorios._aba='evolucao';Telas.relatorios._renderAba()">Evolução</button>
+      </div>
+      <div id="rel-aba-conteudo"></div>`;
+    this._renderAba();
+  },
+  _mudarMes(d) {
+    this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d);
+    this.render();
+  },
+  _renderAba() {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('ativo', b.textContent.toLowerCase().startsWith(
+        this._aba==='categoria'?'cat':this._aba==='faturas'?'fat':this._aba==='evolucao'?'evo':'res'));
+    });
+    const { mes, ano } = this._ref;
+    const el = document.getElementById('rel-aba-conteudo');
+    if (!el) return;
+    if (this._aba === 'resumo')    { el.innerHTML = this._htmlResumo(mes,ano); }
+    if (this._aba === 'categoria') { el.innerHTML = this._htmlCategorias(mes,ano); }
+    if (this._aba === 'faturas')   { el.innerHTML = this._htmlFaturas(mes,ano); }
+    if (this._aba === 'evolucao')  { el.innerHTML = this._htmlEvolucao(); setTimeout(()=>this._drawEvolucao(),50); }
+  },
+  _htmlResumo(mes,ano) {
+    const r = Fin.resumoMensal(mes,ano);
+    const desp = Fin.despesasPorCategoria(mes,ano);
+    const rec  = Fin.receitasPorCategoria(mes,ano);
+    const maxD = desp[0]?.total || 1;
+    const maxR = rec[0]?.total || 1;
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+      <div class="card c-receita"><div class="card-label">Receitas</div><div class="card-valor pos">${Utils.moeda(r.receitas)}</div></div>
+      <div class="card c-despesa"><div class="card-label">Despesas</div><div class="card-valor neg">${Utils.moeda(r.despesas)}</div></div>
+    </div>
+    <div class="card c-saldo" style="text-align:center;margin-bottom:20px">
+      <div class="card-label">Saldo do Mês</div>
+      <div class="card-valor ${r.saldo>=0?'pos':'neg'}" style="font-size:28px">${Utils.moeda(r.saldo)}</div>
+    </div>
+    ${desp.length?`<h3 style="font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:10px">DESPESAS POR CATEGORIA</h3>
+    <div class="card">${desp.map(c=>`
+      <div class="rel-linha">
+        <div class="rel-nome">${c.ico} ${Utils.esc(c.nome)}</div>
+        <div class="rel-barra-wrap"><div class="rel-barra" style="width:${c.total/maxD*100}%;background:${c.cor}"></div></div>
+        <div class="rel-val" style="color:var(--despesa)">${Utils.moeda(c.total)}</div>
+        <div class="rel-pct">${c.pct}%</div>
+      </div>`).join('')}</div>`:''}
+    ${rec.length?`<h3 style="font-size:13px;font-weight:700;color:var(--txt2);margin:16px 0 10px">RECEITAS POR CATEGORIA</h3>
+    <div class="card">${rec.map(c=>`
+      <div class="rel-linha">
+        <div class="rel-nome">${c.ico} ${Utils.esc(c.nome)}</div>
+        <div class="rel-barra-wrap"><div class="rel-barra" style="width:${c.total/maxR*100}%;background:${c.cor}"></div></div>
+        <div class="rel-val" style="color:var(--receita)">${Utils.moeda(c.total)}</div>
+        <div class="rel-pct">${c.pct}%</div>
+      </div>`).join('')}</div>`:''}`;
+  },
+  _htmlCategorias(mes,ano) {
+    const desp = Fin.despesasPorCategoria(mes,ano);
+    const totalDep = desp.reduce((a,c)=>a+c.total,0);
+    if (!desp.length) return `<div class="vazio"><div class="vazio-ico">📊</div><p>Sem despesas neste mês.</p></div>`;
+    const max = desp[0].total;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txt2);padding-bottom:10px;border-bottom:1px solid var(--borda);margin-bottom:6px">
+        <span>Total de despesas</span><strong style="color:var(--despesa)">${Utils.moeda(totalDep)}</strong></div>
+      ${desp.map(c=>`<div class="rel-linha">
+        <div class="rel-nome">${c.ico} ${Utils.esc(c.nome)}</div>
+        <div class="rel-barra-wrap"><div class="rel-barra" style="width:${c.total/max*100}%;background:${c.cor}"></div></div>
+        <div class="rel-val" style="color:var(--despesa)">${Utils.moeda(c.total)}</div>
+        <div class="rel-pct">${c.pct}%</div>
+      </div>`).join('')}
+    </div>`;
+  },
+  _htmlFaturas(mes,ano) {
+    const cartoes = Storage.cartoes();
+    if (!cartoes.length) return `<div class="vazio"><div class="vazio-ico">💳</div><p>Nenhum cartão cadastrado.</p></div>`;
+    let html = '';
+    const allCats = Storage.categorias();
+    for (const c of cartoes) {
+      const per = Fin.periodoFatura(c, mes, ano);
+      const txs = Fin.transacoesCartao(c.id, mes, ano);
+      const total = txs.reduce((a,t)=>a+t.valor,0);
+      html += `<div class="card" style="margin-bottom:14px;border-top:4px solid ${Utils.esc(c.cor)}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+          <div><strong>${Utils.esc(c.nome)}</strong><div style="font-size:12px;color:var(--txt2)">
+            ${Utils.formatarData(per.inicio.toISOString().slice(0,10))} → ${Utils.formatarData(per.fim.toISOString().slice(0,10))}</div></div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--despesa)">${Utils.moeda(total)}</div>
+            <div style="font-size:11px;color:var(--txt2)">Vence ${Utils.formatarData(per.vencimento.toISOString().slice(0,10))}</div></div>
+        </div>
+        ${txs.length ? txs.map(t=>{
+          const cat = allCats.find(x=>x.id===t.categoria);
+          return `<div class="lista-item">
+            <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'}">${cat?.ico||'📦'}</div>
+            <div class="lista-info"><div class="lista-titulo">${Utils.esc(t.descricao)}</div>
+              <div class="lista-sub">${Utils.formatarData(t.data)}${t.parcelas>1?` (${t.parcelaAtual}/${t.parcelas}x)`:''}</div></div>
+            <div class="lista-valor" style="color:var(--despesa)">${Utils.moeda(t.valor)}</div>
+          </div>`;
+        }).join('') : `<div style="color:var(--txt2);font-size:13px;text-align:center;padding:10px">Sem lançamentos neste período.</div>`}
+      </div>`;
+    }
+    return html;
+  },
+  _htmlEvolucao() {
+    return `<div class="card">
+      <div style="display:flex;gap:16px;font-size:12px;margin-bottom:12px">
+        <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:var(--receita);border-radius:2px"></span>Receitas</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:var(--despesa);border-radius:2px"></span>Despesas</span>
+      </div>
+      <div class="chart-wrap"><canvas id="cv-barras" width="600" height="200"></canvas></div>
+    </div>`;
+  },
+  _drawEvolucao() {
+    const dados = Fin.evolucao(6);
+    Graf.barras('cv-barras', dados);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA: CONFIGURAÇÕES
+═══════════════════════════════════════════════════════════ */
+Telas.config = {
+  render() {
+    const cats = Storage.categorias();
+    const catsDesp = cats.filter(c=>c.tipo!=='receita');
+    const catsRec  = cats.filter(c=>c.tipo!=='despesa');
+    const el = document.getElementById('tela-config');
+    el.innerHTML = `
+      <div class="sec-header"><h1 class="sec-titulo">⚙️ Configurações</h1></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">💾 Backup de Dados</h2>
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Exporte todos os seus dados como JSON. Guarde o arquivo com segurança.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-prim" onclick="Telas.config.exportar()">⬇️ Exportar JSON</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('imp-file').click()">⬆️ Importar JSON</button>
+        </div>
+        <input type="file" id="imp-file" accept=".json" style="display:none" onchange="Telas.config.importar(this)">
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">🏷️ Categorias de Despesa</h2>
+        <div id="cats-desp">
+          ${catsDesp.map(c=>`<div class="lista-item">
+            <div class="ico-cat" style="background:${c.cor+'22'}">${c.ico}</div>
+            <div class="lista-info"><div class="lista-titulo">${Utils.esc(c.nome)}</div></div>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.config.excluirCat('${c.id}')">🗑️</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Telas.config.novaCat('despesa')">+ Nova categoria</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">🏷️ Categorias de Receita</h2>
+        <div id="cats-rec">
+          ${catsRec.map(c=>`<div class="lista-item">
+            <div class="ico-cat" style="background:${c.cor+'22'}">${c.ico}</div>
+            <div class="lista-info"><div class="lista-titulo">${Utils.esc(c.nome)}</div></div>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.config.excluirCat('${c.id}')">🗑️</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Telas.config.novaCat('receita')">+ Nova categoria</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">ℹ️ Como usar</h2>
+        <ul style="font-size:13px;color:var(--txt2);line-height:2;padding-left:18px">
+          <li>Cadastre suas <strong>contas</strong> bancárias e <strong>cartões</strong> primeiro.</li>
+          <li>Use o botão <strong>＋</strong> para adicionar lançamentos rapidamente.</li>
+          <li>Para compras no <strong>cartão de crédito</strong>, escolha "Despesa" e selecione o cartão.</li>
+          <li>Quando pagar a fatura, use o tipo <strong>"Pag. Fatura"</strong>.</li>
+          <li>Faça <strong>backup</strong> regularmente para não perder seus dados.</li>
+          <li>Os dados ficam salvos apenas neste navegador/dispositivo.</li>
+        </ul>
+      </div>
+
+      <div style="text-align:center;font-size:11px;color:var(--txt2);padding:10px">
+        Controle Financeiro Offline v1.0 • Dados salvos localmente
+      </div>`;
+  },
+  exportar() {
+    const dados = Storage.exportar();
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `financas_backup_${Utils.dataHoje()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Backup exportado!');
+  },
+  importar(input) {
+    const f = input.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const dados = JSON.parse(e.target.result);
+        Modal.confirmar(`Isso substituirá TODOS os dados atuais. Continuar?`, () => {
+          Storage.importar(dados);
+          toast(`Importado: ${dados.contas?.length||0} contas, ${dados.cartoes?.length||0} cartões, ${dados.transacoes?.length||0} lançamentos.`, 3500);
+          this.render();
+        });
+      } catch { toast('Arquivo inválido.'); }
+    };
+    reader.readAsText(f);
+    input.value = '';
+  },
+  novaCat(tipo) {
+    Modal.abrir('Nova Categoria', `
+      <div class="form-grupo"><label>Nome</label>
+        <input id="nc-nome" type="text" placeholder="Ex: Pet Shop">
+        <div class="form-erro" id="nc-err">Informe o nome</div></div>
+      <div class="form-grupo"><label>Emoji (ícone)</label>
+        <input id="nc-ico" type="text" placeholder="Ex: 🐾" maxlength="4" value="📦"></div>
+      <div class="form-grupo"><label>Cor</label>
+        <div class="cor-grid">${CORES.map((cor,i)=>`<div class="cor-swatch${i===0?' sel':''}" style="background:${cor}" data-cor="${cor}" onclick="Telas.config._selCor(this)"></div>`).join('')}</div>
+      </div>`,
+      { onOk: () => this._salvarCat(tipo) });
+  },
+  _selCor(el) {
+    document.querySelectorAll('#modal-corpo .cor-swatch').forEach(e=>e.classList.remove('sel'));
+    el.classList.add('sel');
+  },
+  _salvarCat(tipo) {
+    const nome = document.getElementById('nc-nome').value.trim();
+    if (!nome) { document.getElementById('nc-err').classList.add('vis'); return; }
+    const cor = document.querySelector('#modal-corpo .cor-swatch.sel')?.dataset.cor || CORES[0];
+    const ico = document.getElementById('nc-ico').value.trim() || '📦';
+    const arr = Storage.categorias();
+    arr.push({ id: Utils.uuid(), nome, ico, cor, tipo });
+    Storage.salvarCategorias(arr);
+    Modal.fechar(); this.render(); toast('Categoria criada!');
+  },
+  excluirCat(id) {
+    Modal.confirmar('Excluir esta categoria?', () => {
+      Storage.salvarCategorias(Storage.categorias().filter(c=>c.id!==id));
+      this.render(); toast('Categoria excluída.');
+    });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   FAB  (abre modal de novo lançamento)
+═══════════════════════════════════════════════════════════ */
+document.getElementById('fab').addEventListener('click', () => {
+  const tela = Router.atual;
+  if (tela === 'contas')   { Telas.contas.novo(); return; }
+  if (tela === 'cartoes')  { Telas.cartoes.novo(); return; }
+  Telas.lancamentos.novo();
+});
+
+document.getElementById('modal-fechar').addEventListener('click', () => Modal.fechar());
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) Modal.fechar();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+seed();
+Router.init();
+</script>
+</body>
+</html>
