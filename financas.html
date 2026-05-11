@@ -626,6 +626,12 @@ const Chat = {
     this._addMsg('user', txt);
     const t = txt.toLowerCase();
 
+    // Detectar se é pagamento de fatura
+    if (/pagu|pagar|quero pagar|vou pagar/.test(t) && /fatura|cartão|cartao|nubank|inter|credito|crédito/.test(t)) {
+      this._abrirPagarFatura(txt);
+      return;
+    }
+
     // Detectar se é investimento
     if (/investi|apliquei|guardei|poupei|poupi|coloquei na poupan|coloquei no invest/.test(t)) {
       const valor = this._extrairValor(t);
@@ -698,6 +704,48 @@ const Chat = {
     return txt.replace(/^(gastei|paguei|comprei|recebi|ganhei|investi)\s+/i,'')
               .replace(/\s+r\$[\d.,]+/gi,'').replace(/\s+[\d.,]+\s*reais?/gi,'')
               .trim() || txt;
+  },
+  _abrirPagarFatura(txtOriginal) {
+    const cartoes = Storage.cartoes();
+    const contas  = Storage.contas();
+    if (!cartoes.length) { this._addMsg('app', '❌ Nenhum cartão cadastrado. Cadastre um cartão primeiro.', 'err'); return; }
+    if (!contas.length)  { this._addMsg('app', '❌ Nenhuma conta bancária cadastrada. Cadastre uma conta primeiro.', 'err'); return; }
+    const { mes, ano } = Utils.mesAtual();
+    const cartOpts  = cartoes.map(c => {
+      const fat = Fin.faturaCartao(c.id, mes, ano);
+      return `<option value="${c.id}">${Utils.esc(c.nome)} — fatura ${Utils.moeda(fat)}</option>`;
+    }).join('');
+    const contaOpts = contas.map(c => `<option value="${c.id}">${Utils.esc(c.nome)}</option>`).join('');
+    const valorSug  = this._extrairValor(txtOriginal.toLowerCase()) || '';
+    Modal.abrir('💳 Pagamento de Fatura', `
+      <div class="form-grupo"><label>Cartão</label>
+        <select id="pf-cartao">${cartOpts}</select></div>
+      <div class="form-grupo"><label>Conta que vai debitar</label>
+        <select id="pf-conta">${contaOpts}</select></div>
+      <div class="form-grupo"><label>Valor (R$)</label>
+        <input id="pf-valor" type="number" step="0.01" min="0.01" placeholder="0,00" value="${valorSug}"></div>
+      <div style="font-size:12px;color:var(--txt2);background:var(--sup2);border-radius:var(--raio-sm);padding:10px">
+        💡 O valor será debitado da conta e reduzirá a fatura do cartão.
+      </div>
+    `, { onOk: () => {
+      const cartaoId = document.getElementById('pf-cartao').value;
+      const contaId  = document.getElementById('pf-conta').value;
+      const valor    = parseFloat(document.getElementById('pf-valor').value) || 0;
+      if (!cartaoId || !contaId || valor <= 0) { alert('Preencha todos os campos corretamente.'); return; }
+      const cartao = cartoes.find(c => c.id === cartaoId);
+      const conta  = contas.find(c => c.id === contaId);
+      const arr = Storage.transacoes();
+      arr.push({ id: Utils.uuid(), data: Utils.dataHoje(), descricao: 'Pagamento de fatura ' + cartao.nome,
+        valor, tipo: 'fatura_cartao', categoria: null,
+        contaId, cartaoId, contaDestinoId: null,
+        parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null });
+      Storage.salvarTransacoes(arr);
+      Modal.fechar();
+      this._addMsg('app', `✅ Pagamento de ${Utils.moeda(valor)} registrado! Fatura ${cartao.nome} reduzida. Conta ${conta.nome} debitada.`, 'ok');
+      if (Router.atual === 'cartoes') Telas.cartoes.render();
+      if (Router.atual === 'lancamentos') Telas.lancamentos._renderLista();
+      if (Router.atual === 'dashboard') Telas.dashboard.render();
+    }});
   },
   _addMsg(de, msg, cls='') {
     this._hist.push({ de, msg, cls, ts: Date.now() });
