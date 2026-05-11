@@ -1282,7 +1282,7 @@ Telas.lancamentos = {
         <input id="tx-desc" type="text" placeholder="Ex: Supermercado" value="${Utils.esc(tx?.descricao||'')}">
         <div class="form-erro" id="tx-desc-err">Informe a descrição</div></div>
 
-      <div id="campos-despesa" style="display:${tipo==='despesa'?'block':'none'}">
+      <div id="campos-despesa" style="display:none">
         <div class="form-grupo"><label>Categoria</label>
           <select id="tx-cat-desp">${catsDespOpts}</select></div>
         <div class="form-grupo"><label>Conta</label>
@@ -1297,21 +1297,21 @@ Telas.lancamentos = {
         </div>
       </div>
 
-      <div id="campos-receita" style="display:${tipo==='receita'?'block':'none'}">
+      <div id="campos-receita" style="display:none">
         <div class="form-grupo"><label>Categoria</label>
           <select id="tx-cat-rec">${catsRecOpts}</select></div>
         <div class="form-grupo"><label>Conta</label>
           <select id="tx-conta-rec">${contaOpts}</select></div>
       </div>
 
-      <div id="campos-transf" style="display:${tipo==='transferencia'?'block':'none'}">
+      <div id="campos-transf" style="display:none">
         <div class="form-grupo"><label>Conta origem</label>
           <select id="tx-orig">${contaOpts}</select></div>
         <div class="form-grupo"><label>Conta destino</label>
           <select id="tx-dest">${contaDestOpts}</select></div>
       </div>
 
-      <div id="campos-fatura" style="display:${tipo==='fatura_cartao'?'block':'none'}">
+      <div id="campos-fatura" style="display:none">
         <div class="form-grupo"><label>Cartão que está pagando</label>
           <select id="tx-cart-fat"><option value="">Selecione o cartão</option>${cartOpts}</select></div>
         <div class="form-grupo"><label>Conta bancária que vai pagar</label>
@@ -1321,6 +1321,7 @@ Telas.lancamentos = {
         </div>
       </div>
     `, { onOk: () => this._salvar(id) });
+    this._mostrarCampos(tipo);
     this._updParc(tx?.parcelas||1);
   },
   _seltipo(btn) {
@@ -1328,10 +1329,19 @@ Telas.lancamentos = {
     document.querySelectorAll('#tipo-pill button').forEach(b => {
       b.className = b.dataset.tipo === tipo ? 'sel-'+tipo : '';
     });
-    ['despesa','receita','transferencia'].forEach(t =>
-      document.getElementById('campos-'+t).style.display = tipo===t?'block':'none'
-    );
-    document.getElementById('campos-fatura').style.display = tipo==='fatura_cartao'?'block':'none';
+    this._mostrarCampos(tipo);
+  },
+  _mostrarCampos(tipo) {
+    const mapa = { despesa:'campos-despesa', receita:'campos-receita', transferencia:'campos-transf', fatura_cartao:'campos-fatura' };
+    ['campos-despesa','campos-receita','campos-transf','campos-fatura'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    const alvo = mapa[tipo];
+    if (alvo) {
+      const el = document.getElementById(alvo);
+      if (el) el.style.display = 'block';
+    }
   },
   _updParc(n) {
     const info = document.getElementById('parc-info');
