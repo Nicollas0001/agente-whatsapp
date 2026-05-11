@@ -140,20 +140,21 @@ body {
 #modal-box {
   background: var(--sup); border: 1px solid var(--borda);
   border-radius: var(--raio); width: 100%; max-width: 480px;
-  max-height: 90vh; overflow-y: auto;
+  max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,.6);
 }
 #modal-header {
   padding: 18px 20px 14px; border-bottom: 1px solid var(--borda);
   display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
 }
 #modal-titulo { font-size: 17px; font-weight: 700; }
 #modal-fechar {
   background: none; border: none; color: var(--txt2); font-size: 22px;
   cursor: pointer; line-height: 1; padding: 4px;
 }
-#modal-corpo { padding: 20px; }
-#modal-footer { padding: 14px 20px; border-top: 1px solid var(--borda); display: flex; gap: 10px; justify-content: flex-end; }
+#modal-corpo { padding: 20px; overflow-y: auto; flex: 1; }
+#modal-footer { padding: 14px 20px; border-top: 1px solid var(--borda); display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; }
 
 /* ── FORMS ────────────────────────────────────────────── */
 .form-grupo { margin-bottom: 16px; }
@@ -2086,6 +2087,30 @@ seed();
 Chat.init();
 verificarFixos();
 Router.init();
+
+// Avisa se parece ser primeira abertura após atualização de arquivo
+(function() {
+  const j = localStorage.getItem('ff_contas');
+  const temDados = j && JSON.parse(j).length > 0;
+  if (!temDados && !localStorage.getItem('ff_bem_vindo')) {
+    localStorage.setItem('ff_bem_vindo', '1');
+    setTimeout(() => {
+      Modal.abrir('👋 Bem-vindo!', `
+        <p style="font-size:14px;line-height:1.8;color:var(--txt2)">
+          <strong style="color:var(--txt)">Parece que é sua primeira vez ou você baixou uma versão nova.</strong><br><br>
+          Seus dados ficam salvos <strong>neste arquivo específico</strong>.<br>
+          Ao baixar uma versão nova, os dados <strong>não são transferidos automaticamente</strong>.<br><br>
+          <strong style="color:var(--aviso)">⚠️ Antes de baixar atualizações futuras:</strong><br>
+          Vá em <strong>Config → Exportar JSON</strong> para salvar um backup.<br>
+          Depois, no arquivo novo, use <strong>Config → Importar JSON</strong> para restaurar tudo.
+        </p>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="document.getElementById('imp-file-bv').click()">⬆️ Importar backup agora</button>
+          <input type="file" id="imp-file-bv" accept=".json" style="display:none" onchange="Telas.config.importar(this);Modal.fechar()">
+        </div>`, { footer: false });
+    }, 600);
+  }
+})();
 </script>
 </body>
 </html>
