@@ -659,17 +659,25 @@ const Chat = {
     const cat = cats.find(c => c.nome === catNome) ||
                 cats.find(c => c.tipo !== (isReceita ? 'despesa' : 'receita')) ||
                 cats.find(c => c.nome === 'Outros') || cats[0];
-    const contas = Storage.contas();
-    const contaId = contas.length === 1 ? contas[0].id : null;
+    const contas  = Storage.contas();
+    const cartoes = Storage.cartoes();
+    // Detectar cartão pelo nome mencionado no texto
+    const cartaoDetect = cartoes.find(c => t.includes(c.nome.toLowerCase()) ||
+      c.nome.toLowerCase().split(' ').filter(w=>w.length>2).some(w => t.includes(w)));
+    // Detectar conta pelo nome mencionado (só se não achou cartão)
+    const contaDetect = !cartaoDetect ? contas.find(c => t.includes(c.nome.toLowerCase()) ||
+      c.nome.toLowerCase().split(' ').filter(w=>w.length>2).some(w => t.includes(w))) : null;
+    const cartaoId = cartaoDetect?.id || null;
+    const contaId  = contaDetect?.id || (!cartaoDetect && contas.length === 1 ? contas[0].id : null);
     const data = this._extrairData(t);
     const arr = Storage.transacoes();
     arr.push({ id: Utils.uuid(), data, descricao: this._limparDesc(txt), valor, tipo,
-      categoria: cat?.id || null, contaId, cartaoId: null, contaDestinoId: null,
+      categoria: cat?.id || null, contaId, cartaoId, contaDestinoId: null,
       parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null });
     Storage.salvarTransacoes(arr);
     const sinal = tipo === 'receita' ? '💰' : '💸';
-    const contaNome = contaId ? ` → ${contas.find(c=>c.id===contaId)?.nome}` : '';
-    this._addMsg('app', `${sinal} ${tipo === 'receita'?'Receita':'Despesa'} de ${Utils.moeda(valor)} em ${cat?.ico||''} ${cat?.nome||'Outros'}${contaNome} registrada!`, 'ok');
+    const ondeNome = cartaoDetect ? ` → cartão ${cartaoDetect.nome}` : contaId ? ` → ${contas.find(c=>c.id===contaId)?.nome}` : '';
+    this._addMsg('app', `${sinal} ${tipo === 'receita'?'Receita':'Despesa'} de ${Utils.moeda(valor)} em ${cat?.ico||''} ${cat?.nome||'Outros'}${ondeNome} registrada!`, 'ok');
     if (Router.atual === 'dashboard') Telas.dashboard.render();
     if (Router.atual === 'lancamentos') Telas.lancamentos._renderLista();
   },
