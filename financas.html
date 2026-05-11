@@ -1282,7 +1282,7 @@ Telas.lancamentos = {
         <input id="tx-desc" type="text" placeholder="Ex: Supermercado" value="${Utils.esc(tx?.descricao||'')}">
         <div class="form-erro" id="tx-desc-err">Informe a descrição</div></div>
 
-      <div id="campos-despesa" style="display:${tipo==='despesa'?'':'none'}">
+      <div id="campos-despesa" style="display:${tipo==='despesa'?'block':'none'}">
         <div class="form-grupo"><label>Categoria</label>
           <select id="tx-cat-desp">${catsDespOpts}</select></div>
         <div class="form-grupo"><label>Conta</label>
@@ -1297,21 +1297,21 @@ Telas.lancamentos = {
         </div>
       </div>
 
-      <div id="campos-receita" style="display:${tipo==='receita'?'':'none'}">
+      <div id="campos-receita" style="display:${tipo==='receita'?'block':'none'}">
         <div class="form-grupo"><label>Categoria</label>
           <select id="tx-cat-rec">${catsRecOpts}</select></div>
         <div class="form-grupo"><label>Conta</label>
           <select id="tx-conta-rec">${contaOpts}</select></div>
       </div>
 
-      <div id="campos-transf" style="display:${tipo==='transferencia'?'':'none'}">
+      <div id="campos-transf" style="display:${tipo==='transferencia'?'block':'none'}">
         <div class="form-grupo"><label>Conta origem</label>
           <select id="tx-orig">${contaOpts}</select></div>
         <div class="form-grupo"><label>Conta destino</label>
           <select id="tx-dest">${contaDestOpts}</select></div>
       </div>
 
-      <div id="campos-fatura" style="display:${tipo==='fatura_cartao'?'':'none'}">
+      <div id="campos-fatura" style="display:${tipo==='fatura_cartao'?'block':'none'}">
         <div class="form-grupo"><label>Cartão que está pagando</label>
           <select id="tx-cart-fat"><option value="">Selecione o cartão</option>${cartOpts}</select></div>
         <div class="form-grupo"><label>Conta bancária que vai pagar</label>
@@ -1329,9 +1329,9 @@ Telas.lancamentos = {
       b.className = b.dataset.tipo === tipo ? 'sel-'+tipo : '';
     });
     ['despesa','receita','transferencia'].forEach(t =>
-      document.getElementById('campos-'+t).style.display = tipo===t?'':'none'
+      document.getElementById('campos-'+t).style.display = tipo===t?'block':'none'
     );
-    document.getElementById('campos-fatura').style.display = tipo==='fatura_cartao'?'':'none';
+    document.getElementById('campos-fatura').style.display = tipo==='fatura_cartao'?'block':'none';
   },
   _updParc(n) {
     const info = document.getElementById('parc-info');
