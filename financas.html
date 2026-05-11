@@ -1161,7 +1161,10 @@ Telas.lancamentos = {
       ...cartoes.map(c=>`<option value="${c.id}"${f.cartaoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
     const el = document.getElementById('tela-lancamentos');
     el.innerHTML = `
-      <div class="sec-header"><h1 class="sec-titulo">📋 Lançamentos</h1></div>
+      <div class="sec-header">
+        <h1 class="sec-titulo">📋 Lançamentos</h1>
+        <button class="btn btn-ghost btn-sm" onclick="abrirImportarLote()">📋 Importar lote</button>
+      </div>
       <div class="mes-nav">
         <button onclick="Telas.lancamentos._mudarMes(-1)">◀</button>
         <span class="mes-nome">${Utils.nomeMes(f.mes,f.ano)}</span>
@@ -1437,6 +1440,76 @@ Telas.lancamentos = {
     this._renderLista(); toast('Parcelas excluídas.');
   }
 };
+
+/* ═══════════════════════════════════════════════════════════
+   IMPORTAR LOTE
+═══════════════════════════════════════════════════════════ */
+function abrirImportarLote() {
+  const cartoes = Storage.cartoes();
+  const contas  = Storage.contas();
+  const cartOpts = [`<option value="">Sem cartão (débito/dinheiro)</option>`,
+    ...cartoes.map(c=>`<option value="${c.id}">${Utils.esc(c.nome)}</option>`)].join('');
+  const contaOpts = [`<option value="">Nenhuma</option>`,
+    ...contas.map(c=>`<option value="${c.id}">${Utils.esc(c.nome)}</option>`)].join('');
+  const ref = Utils.addMes(Utils.mesAtual().mes, Utils.mesAtual().ano, -1);
+  const dataPad = `${ref.ano}-${String(ref.mes).padStart(2,'0')}-15`;
+  Modal.abrir('📋 Importar Lote de Gastos', `
+    <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Cole uma despesa por linha: <strong>Descrição valor</strong><br>Ex: <em>Energético 9,99</em> ou <em>iFood 126,98</em></p>
+    <div class="form-grupo"><label>Lista de gastos</label>
+      <textarea id="lote-txt" style="height:180px;resize:vertical;width:100%;padding:10px;background:var(--sup2);border:1px solid var(--borda);border-radius:var(--raio-sm);color:var(--txt);font-family:var(--fonte);font-size:13px"
+        placeholder="Energético 9,99&#10;Amazon Prime 18,90&#10;iFood 126,98&#10;Jiu Jitsu 260,00"
+        oninput="previewLote()"></textarea></div>
+    <div class="form-row">
+      <div class="form-grupo"><label>Data de referência</label>
+        <input id="lote-data" type="date" value="${dataPad}"></div>
+      <div class="form-grupo"><label>Cartão de crédito</label>
+        <select id="lote-cart">${cartOpts}</select></div>
+    </div>
+    <div id="lote-preview" style="margin-top:8px;font-size:12px;background:var(--sup2);border-radius:var(--raio-sm);padding:0"></div>
+  `, { ok: '✅ Importar tudo', onOk: executarImportarLote });
+}
+
+function previewLote() {
+  const txt = document.getElementById('lote-txt')?.value || '';
+  const linhas = txt.split('\n').filter(l => l.trim());
+  const el = document.getElementById('lote-preview');
+  if (!el) return;
+  if (!linhas.length) { el.innerHTML = ''; return; }
+  let total = 0, rows = '';
+  for (const l of linhas) {
+    const v = Chat._extrairValor(l.toLowerCase());
+    const catNome = Chat._detectarCategoria(l.toLowerCase());
+    if (v) { total += v; rows += `<div style="display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--borda)"><span style="color:var(--txt)">${Utils.esc(l.trim())}</span><span style="color:var(--receita);font-weight:700">${Utils.moeda(v)}</span></div>`; }
+    else rows += `<div style="padding:5px 10px;color:var(--despesa)">⚠ Sem valor: ${Utils.esc(l.trim())}</div>`;
+  }
+  el.innerHTML = `<div style="padding:8px 10px;font-weight:700;color:var(--txt2);border-bottom:1px solid var(--borda)">${linhas.length} itens detectados</div>${rows}<div style="padding:8px 10px;font-weight:700;text-align:right;color:var(--despesa)">Total: ${Utils.moeda(total)}</div>`;
+}
+
+function executarImportarLote() {
+  const txt     = document.getElementById('lote-txt')?.value || '';
+  const data    = document.getElementById('lote-data')?.value || Utils.dataHoje();
+  const cartaoId= document.getElementById('lote-cart')?.value || null;
+  const linhas  = txt.split('\n').filter(l => l.trim());
+  const cats    = Storage.categorias();
+  const arr     = Storage.transacoes();
+  let count = 0;
+  for (const linha of linhas) {
+    const t = linha.toLowerCase();
+    const valor = Chat._extrairValor(t);
+    if (!valor) continue;
+    const catNome = Chat._detectarCategoria(t);
+    const cat = cats.find(c => c.nome === catNome) || cats.find(c => c.nome === 'Outros') || cats[0];
+    arr.push({ id: Utils.uuid(), data, descricao: linha.trim(), valor, tipo: 'despesa',
+      categoria: cat?.id || null, contaId: null, cartaoId: cartaoId || null,
+      contaDestinoId: null, parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null });
+    count++;
+  }
+  Storage.salvarTransacoes(arr);
+  Modal.fechar();
+  if (Router.atual === 'lancamentos') Telas.lancamentos._renderLista();
+  if (Router.atual === 'dashboard')   Telas.dashboard.render();
+  toast(`${count} lançamentos importados! 🎉`, 3000);
+}
 
 /* ═══════════════════════════════════════════════════════════
    TELA: DASHBOARD
