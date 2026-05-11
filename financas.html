@@ -1355,6 +1355,10 @@ Telas.lancamentos = {
     else document.getElementById('tx-valor-err').classList.remove('vis');
     if (!desc) { document.getElementById('tx-desc-err').classList.add('vis'); valido = false; }
     else document.getElementById('tx-desc-err').classList.remove('vis');
+    if (tipo==='fatura_cartao') {
+      const cartFat = document.getElementById('tx-cart-fat').value;
+      if (!cartFat) { alert('Selecione o cartão que está sendo pago!'); return; }
+    }
     if (!valido) return;
     const data = document.getElementById('tx-data').value || Utils.dataHoje();
     const arr = Storage.transacoes();
