@@ -853,6 +853,16 @@ const Fin = {
     const { aberto } = this._periodosFatura(cartao);
     return this.faturaCartao(cartaoId, aberto.mes, aberto.ano);
   },
+  totalComprometido(cartaoId) {
+    // Soma TODAS as despesas no cartão menos todos os pagamentos feitos
+    // Isso inclui parcelas de meses futuros — é o limite real já comprometido
+    const txs = Storage.transacoes();
+    const charges  = txs.filter(t => t.cartaoId === cartaoId && t.tipo === 'despesa')
+                        .reduce((acc, t) => acc + t.valor, 0);
+    const payments = txs.filter(t => t.cartaoId === cartaoId && t.tipo === 'fatura_cartao')
+                        .reduce((acc, t) => acc + t.valor, 0);
+    return Math.max(0, charges - payments);
+  },
   resumoMensal(mes, ano) {
     let receitas = 0, despesas = 0;
     for (const t of Storage.transacoes()) {
@@ -1138,14 +1148,13 @@ Telas.cartoes = {
       html += `<div class="card-grid">`;
       for (const c of cartoes) {
         const { fechado, aberto } = Fin._periodosFatura(c);
-        const fatFechada = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
-        const fatAberta  = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
-        const totalUsado = fatFechada + fatAberta;
-        const disp = c.limite - totalUsado;
-        const pct  = c.limite ? Math.min(100, Math.round(totalUsado/c.limite*100)) : 0;
+        const fatFechada   = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
+        const fatAberta    = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
+        const comprometido = Fin.totalComprometido(c.id);
+        const parcelasProx = Math.max(0, comprometido - fatFechada - fatAberta);
+        const disp = c.limite - comprometido;
+        const pct  = c.limite ? Math.min(100, Math.round(comprometido/c.limite*100)) : 0;
         const cls  = pct < 70 ? 'barra-ok' : pct < 90 ? 'barra-med' : 'barra-alto';
-        const nomeMesFec = Utils.nomeMes ? Utils.nomeMes(fechado.mes) : fechado.mes;
-        const nomeMesAb  = Utils.nomeMes ? Utils.nomeMes(aberto.mes)  : aberto.mes;
         html += `<div class="card" style="border-top:4px solid ${Utils.esc(c.cor)}">
           <div style="display:flex;justify-content:space-between;margin-bottom:10px">
             <div><div style="font-size:16px;font-weight:700">${Utils.esc(c.nome)}</div>
@@ -1157,12 +1166,16 @@ Telas.cartoes = {
             <span style="color:var(--txt2)">🔴 A pagar (vence ${c.diaVencimento}/${String(fechado.mes).padStart(2,'0')})</span>
             <strong style="color:${fatFechada>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFechada)}</strong>
           </div>
-          <div style="font-size:12px;margin-bottom:8px;display:flex;justify-content:space-between">
+          <div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between">
             <span style="color:var(--txt2)">🟡 Em aberto (fecha ${c.diaFechamento}/${String(aberto.mes).padStart(2,'0')})</span>
             <strong style="color:${fatAberta>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAberta)}</strong>
           </div>
+          ${parcelasProx>0?`<div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between">
+            <span style="color:var(--txt2)">🔵 Parcelas futuras</span>
+            <strong style="color:#5b9bd5">${Utils.moeda(parcelasProx)}</strong>
+          </div>`:''}
           <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--txt2);margin-bottom:4px">
-            <span>Total comprometido</span><span>${Utils.moeda(totalUsado)}</span>
+            <span>Total comprometido</span><strong>${Utils.moeda(comprometido)}</strong>
           </div>
           <div class="barra-wrap"><div class="barra-fill ${cls}" style="width:${pct}%"></div></div>
           <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txt2);margin-bottom:14px">
@@ -1659,21 +1672,21 @@ Telas.dashboard = {
       cartoesHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Faturas dos Cartões</h2><div class="card-grid">`;
       for (const c of cartoes) {
         const { fechado, aberto } = Fin._periodosFatura(c);
-        const fatFec = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
-        const fatAb  = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
-        const total  = fatFec + fatAb;
-        const pct    = c.limite ? Math.min(100, Math.round(total/c.limite*100)) : 0;
-        const cls    = pct<70?'barra-ok':pct<90?'barra-med':'barra-alto';
+        const fatFec   = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
+        const fatAb    = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
+        const comprom  = Fin.totalComprometido(c.id);
+        const pctD     = c.limite ? Math.min(100, Math.round(comprom/c.limite*100)) : 0;
+        const clsD     = pctD<70?'barra-ok':pctD<90?'barra-med':'barra-alto';
         cartoesHtml += `<div class="card" style="border-left:4px solid ${Utils.esc(c.cor)}">
           <div style="font-weight:700;margin-bottom:8px">${Utils.esc(c.nome)}</div>
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
             <span style="color:var(--txt2)">🔴 A pagar (vence ${c.diaVencimento}/${String(fechado.mes).padStart(2,'0')})</span>
             <strong style="color:${fatFec>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFec)}</strong></div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
             <span style="color:var(--txt2)">🟡 Em aberto (fecha ${c.diaFechamento}/${String(aberto.mes).padStart(2,'0')})</span>
             <strong style="color:${fatAb>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAb)}</strong></div>
-          <div class="barra-wrap"><div class="barra-fill ${cls}" style="width:${pct}%"></div></div>
-          <div style="font-size:12px;color:var(--txt2)">Disponível: <strong style="color:${(c.limite-total)>=0?'var(--receita)':'var(--despesa)'}">${Utils.moeda(c.limite-total)}</strong></div>
+          <div class="barra-wrap"><div class="barra-fill ${clsD}" style="width:${pctD}%"></div></div>
+          <div style="font-size:12px;color:var(--txt2)">Disponível real: <strong style="color:${(c.limite-comprom)>=0?'var(--receita)':'var(--despesa)'}">${Utils.moeda(c.limite-comprom)}</strong></div>
         </div>`;
       }
       cartoesHtml += `</div>`;
@@ -1701,10 +1714,7 @@ Telas.dashboard = {
       recTxHtml += `</div>`;
     }
     const totalCatDep = cats.reduce((a,c)=>a+c.total,0);
-    const totalFaturasFechadas = cartoes.reduce((acc, c) => {
-      const { fechado } = Fin._periodosFatura(c);
-      return acc + Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
-    }, 0);
+    const totalFaturasFechadas = cartoes.reduce((acc, c) => acc + Fin.totalComprometido(c.id), 0);
     const saldoLiquido = total - totalFaturasFechadas;
     const el = document.getElementById('tela-dashboard');
     el.innerHTML = `
