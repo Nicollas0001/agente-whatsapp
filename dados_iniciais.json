@@ -1,0 +1,258 @@
+{
+  "contas": [
+    {
+      "id": "c954852b-07a3-411c-8daf-f23fd0f2a7d7",
+      "nome": "BTG Black",
+      "banco": "BTG",
+      "tipo": "investimento",
+      "saldoInicial": 31.95,
+      "cor": "#6C63FF",
+      "criadaEm": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "id": "26fdb119-ec3e-4ca6-baee-4cb1b6278cb3",
+      "nome": "Bradesco",
+      "banco": "Bradesco",
+      "tipo": "corrente",
+      "saldoInicial": 0,
+      "cor": "#EF476F",
+      "criadaEm": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "id": "ce7a8fa9-b4d1-4076-a2d8-5fd853c9d18f",
+      "nome": "Inter",
+      "banco": "Inter",
+      "tipo": "corrente",
+      "saldoInicial": 0.18,
+      "cor": "#06D6A0",
+      "criadaEm": "2026-05-01T00:00:00.000Z"
+    }
+  ],
+  "cartoes": [
+    {
+      "id": "43bfb328-7880-4a47-9952-6e302c798cd1",
+      "nome": "Nubank",
+      "banco": "Nubank",
+      "limite": 800,
+      "diaFechamento": 10,
+      "diaVencimento": 15,
+      "cor": "#EF476F",
+      "criadaEm": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "id": "7095c2f9-691c-4dc5-a02c-c49997db6128",
+      "nome": "Inter Black",
+      "banco": "Inter",
+      "limite": 1126.2,
+      "diaFechamento": 4,
+      "diaVencimento": 10,
+      "cor": "#06D6A0",
+      "criadaEm": "2026-05-01T00:00:00.000Z"
+    }
+  ],
+  "transacoes": [
+    {
+      "id": "5d675c4e-b80f-45d5-9426-2c51638f8b1c",
+      "data": "2026-05-05",
+      "descricao": "Salário",
+      "valor": 460.0,
+      "tipo": "receita",
+      "categoria": "dcdb04bb-f5a2-4b95-b335-89040f09b974",
+      "contaId": "26fdb119-ec3e-4ca6-baee-4cb1b6278cb3",
+      "cartaoId": null,
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    },
+    {
+      "id": "759ecede-4eb2-4357-beb8-4f5002957c62",
+      "data": "2026-05-05",
+      "descricao": "Mesada mãe",
+      "valor": 580.0,
+      "tipo": "receita",
+      "categoria": "f4124e52-c289-4ec2-a4c7-c7ffa7fedc7f",
+      "contaId": "26fdb119-ec3e-4ca6-baee-4cb1b6278cb3",
+      "cartaoId": null,
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    },
+    {
+      "id": "1cc027dd-23a3-4b19-bef1-6ce7a8780ab3",
+      "data": "2026-05-15",
+      "descricao": "Salário Marista",
+      "valor": 888.81,
+      "tipo": "receita",
+      "categoria": "dcdb04bb-f5a2-4b95-b335-89040f09b974",
+      "contaId": "26fdb119-ec3e-4ca6-baee-4cb1b6278cb3",
+      "cartaoId": null,
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    },
+    {
+      "id": "e9cb4b5b-f093-42ea-b754-0120e6c9d96d",
+      "data": "2026-04-24",
+      "descricao": "Gastos Nubank - Fatura Mai/26",
+      "valor": 771.51,
+      "tipo": "despesa",
+      "categoria": "ae7ee904-8022-4ca3-9d8a-6681b90366e3",
+      "contaId": null,
+      "cartaoId": "43bfb328-7880-4a47-9952-6e302c798cd1",
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    },
+    {
+      "id": "7c80d8e2-7886-4863-a136-a6569b045a79",
+      "data": "2026-05-05",
+      "descricao": "Gastos Inter Black - Fatura Jun/26",
+      "valor": 639.5,
+      "tipo": "despesa",
+      "categoria": "ae7ee904-8022-4ca3-9d8a-6681b90366e3",
+      "contaId": null,
+      "cartaoId": "7095c2f9-691c-4dc5-a02c-c49997db6128",
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    },
+    {
+      "id": "ed8ab667-e0cf-4dd2-be5b-ff6a30aa02ad",
+      "data": "2026-05-05",
+      "descricao": "Anuidade Inter Black",
+      "valor": 45.0,
+      "tipo": "despesa",
+      "categoria": "ae7ee904-8022-4ca3-9d8a-6681b90366e3",
+      "contaId": null,
+      "cartaoId": "7095c2f9-691c-4dc5-a02c-c49997db6128",
+      "contaDestinoId": null,
+      "parcelas": 1,
+      "parcelaAtual": 1,
+      "parcelaGrupoId": null
+    }
+  ],
+  "categorias": [
+    {
+      "id": "91c9348f-78c4-417f-8e5b-93203b6f172a",
+      "nome": "Alimentação / Mercado",
+      "ico": "🛒",
+      "cor": "#EF476F",
+      "tipo": "despesa"
+    },
+    {
+      "id": "73e40c2f-d589-4b69-b3c4-1c1223f4a87d",
+      "nome": "Transporte / Combustível",
+      "ico": "⛽",
+      "cor": "#118AB2",
+      "tipo": "despesa"
+    },
+    {
+      "id": "8ca0e523-d6f1-4dfa-87bf-93864d24c1c8",
+      "nome": "Lazer / Assinaturas",
+      "ico": "🎮",
+      "cor": "#6C63FF",
+      "tipo": "despesa"
+    },
+    {
+      "id": "122ebfd1-9f14-4aef-950e-45c539750da8",
+      "nome": "Jiu Jitsu",
+      "ico": "🥋",
+      "cor": "#FF6B6B",
+      "tipo": "despesa"
+    },
+    {
+      "id": "bfb01d8e-8f7f-421c-9d81-521b11bb7f80",
+      "nome": "Cantina",
+      "ico": "☕",
+      "cor": "#4ECDC4",
+      "tipo": "despesa"
+    },
+    {
+      "id": "f08ff381-d05f-4635-bf05-f7f5fe3f3722",
+      "nome": "Energético",
+      "ico": "⚡",
+      "cor": "#FFD166",
+      "tipo": "despesa"
+    },
+    {
+      "id": "edc78203-da0e-4789-a428-a943dc80e7ca",
+      "nome": "Conta de Água",
+      "ico": "💧",
+      "cor": "#45B7D1",
+      "tipo": "despesa"
+    },
+    {
+      "id": "d2b77235-8c20-45c3-97c7-b8857530d130",
+      "nome": "Aluguel",
+      "ico": "🏠",
+      "cor": "#96CEB4",
+      "tipo": "despesa"
+    },
+    {
+      "id": "18c67798-d624-4a46-b5f6-8f01982d8d58",
+      "nome": "Telefone",
+      "ico": "📱",
+      "cor": "#FFEAA7",
+      "tipo": "despesa"
+    },
+    {
+      "id": "88dbbec0-1577-405f-ad13-89f8f450ae9d",
+      "nome": "Saúde / Farmácia",
+      "ico": "💊",
+      "cor": "#DDA0DD",
+      "tipo": "despesa"
+    },
+    {
+      "id": "0042cee9-cfa9-4556-a455-1e8ab896c923",
+      "nome": "Educação",
+      "ico": "📚",
+      "cor": "#98D8C8",
+      "tipo": "despesa"
+    },
+    {
+      "id": "ae7ee904-8022-4ca3-9d8a-6681b90366e3",
+      "nome": "Outros",
+      "ico": "📦",
+      "cor": "#06D6A0",
+      "tipo": "despesa"
+    },
+    {
+      "id": "dcdb04bb-f5a2-4b95-b335-89040f09b974",
+      "nome": "Salário",
+      "ico": "💼",
+      "cor": "#06D6A0",
+      "tipo": "receita"
+    },
+    {
+      "id": "d2bb48a8-74d1-4a27-8e12-c00b8c9b806a",
+      "nome": "Freelance",
+      "ico": "💻",
+      "cor": "#6C63FF",
+      "tipo": "receita"
+    },
+    {
+      "id": "42691148-cfa5-4375-b03e-c22c88614a1d",
+      "nome": "Investimentos",
+      "ico": "📈",
+      "cor": "#118AB2",
+      "tipo": "receita"
+    },
+    {
+      "id": "f4124e52-c289-4ec2-a4c7-c7ffa7fedc7f",
+      "nome": "Outros (rec.)",
+      "ico": "🎁",
+      "cor": "#FFD166",
+      "tipo": "receita"
+    }
+  ],
+  "investimentos": [],
+  "fixos": [],
+  "metaInvest": 500,
+  "config": {},
+  "exportadoEm": "2026-05-11T00:00:00.000Z"
+}
