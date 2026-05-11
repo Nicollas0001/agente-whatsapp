@@ -764,13 +764,17 @@ const Fin = {
     if (!cartao) return [];
     const { inicio, fim } = this.periodoFatura(cartao, mes, ano);
     return Storage.transacoes().filter(t => {
-      if (t.cartaoId !== cartaoId) return false;
+      if (t.cartaoId !== cartaoId || t.tipo !== 'despesa') return false;
       const d = new Date(t.data + 'T00:00:00');
       return d >= inicio && d <= fim;
     });
   },
   faturaCartao(cartaoId, mes, ano) {
-    return this.transacoesCartao(cartaoId, mes, ano).reduce((acc, t) => acc + t.valor, 0);
+    const charges  = this.transacoesCartao(cartaoId, mes, ano).reduce((acc, t) => acc + t.valor, 0);
+    const payments = Storage.transacoes()
+      .filter(t => t.tipo === 'fatura_cartao' && t.cartaoId === cartaoId && Utils.datasNoMes(t.data, mes, ano))
+      .reduce((acc, t) => acc + t.valor, 0);
+    return Math.max(0, charges - payments);
   },
   faturaAtual(cartaoId) {
     const { mes, ano } = Utils.mesAtual();
@@ -1307,10 +1311,13 @@ Telas.lancamentos = {
       </div>
 
       <div id="campos-fatura" style="display:${tipo==='fatura_cartao'?'':'none'}">
-        <div class="form-grupo"><label>Cartão pago</label>
-          <select id="tx-cart-fat"><option value="">Selecione</option>${cartOpts}</select></div>
-        <div class="form-grupo"><label>Conta debitada</label>
-          <select id="tx-conta-fat">${contaOpts}</select></div>
+        <div class="form-grupo"><label>Cartão que está pagando</label>
+          <select id="tx-cart-fat"><option value="">Selecione o cartão</option>${cartOpts}</select></div>
+        <div class="form-grupo"><label>Conta bancária que vai pagar</label>
+          <select id="tx-conta-fat"><option value="">Selecione a conta</option>${contaOpts}</select></div>
+        <div style="font-size:12px;color:var(--txt2);background:var(--sup2);border-radius:var(--raio-sm);padding:10px;margin-top:-8px">
+          💡 O valor será debitado da conta bancária e reduzirá a fatura do cartão.
+        </div>
       </div>
     `, { onOk: () => this._salvar(id) });
     this._updParc(tx?.parcelas||1);
@@ -1320,10 +1327,9 @@ Telas.lancamentos = {
     document.querySelectorAll('#tipo-pill button').forEach(b => {
       b.className = b.dataset.tipo === tipo ? 'sel-'+tipo : '';
     });
-    ['despesa','receita','transferencia','fatura_cartao'].forEach(t =>
+    ['despesa','receita','transferencia'].forEach(t =>
       document.getElementById('campos-'+t).style.display = tipo===t?'':'none'
     );
-    // corrige nome dos campos ocultos
     document.getElementById('campos-fatura').style.display = tipo==='fatura_cartao'?'':'none';
   },
   _updParc(n) {
