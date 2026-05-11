@@ -75,12 +75,7 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 14px;
 }
-.card-resumo {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
+.card-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
 .card-resumo .card {
   padding: 14px;
   border-left: 4px solid var(--prim);
@@ -392,7 +387,7 @@ canvas { display: block; }
 
 @media (min-width: 768px) {
   #conteudo { padding: 24px 24px calc(var(--nav-h) + 16px); }
-  .card-resumo { grid-template-columns: repeat(4, 1fr); }
+  .card-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
 }
 @media (max-width: 480px) {
   #nav a span:not(.nav-ico) { display: none; }
@@ -1706,6 +1701,11 @@ Telas.dashboard = {
       recTxHtml += `</div>`;
     }
     const totalCatDep = cats.reduce((a,c)=>a+c.total,0);
+    const totalFaturasFechadas = cartoes.reduce((acc, c) => {
+      const { fechado } = Fin._periodosFatura(c);
+      return acc + Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
+    }, 0);
+    const saldoLiquido = total - totalFaturasFechadas;
     const el = document.getElementById('tela-dashboard');
     el.innerHTML = `
       <div class="chat-wrap">
@@ -1723,14 +1723,17 @@ Telas.dashboard = {
         <button onclick="Telas.dashboard._mudarMes(1)">▶</button>
       </div>
       <div class="card-resumo">
-        <div class="card"><div class="card-label">Saldo Total</div>
+        <div class="card"><div class="card-label">Saldo Contas</div>
           <div class="card-valor ${total>=0?'pos':'neg'}">${Utils.moeda(total)}</div></div>
+        <div class="card" style="border-left:3px solid var(--despesa)"><div class="card-label">Faturas a Pagar</div>
+          <div class="card-valor neg">${Utils.moeda(totalFaturasFechadas)}</div></div>
+        <div class="card" style="border-left:3px solid #f5a623"><div class="card-label">Saldo Líquido</div>
+          <div class="card-label" style="font-size:10px;margin-bottom:2px">(contas − faturas)</div>
+          <div class="card-valor ${saldoLiquido>=0?'pos':'neg'}">${Utils.moeda(saldoLiquido)}</div></div>
         <div class="card c-receita"><div class="card-label">Receitas</div>
           <div class="card-valor pos">${Utils.moeda(resumo.receitas)}</div></div>
         <div class="card c-despesa"><div class="card-label">Despesas</div>
           <div class="card-valor neg">${Utils.moeda(resumo.despesas)}</div></div>
-        <div class="card c-saldo"><div class="card-label">Saldo do Mês</div>
-          <div class="card-valor ${resumo.saldo>=0?'pos':'neg'}">${Utils.moeda(resumo.saldo)}</div></div>
       </div>
       ${cartoesHtml}
       ${cats.length ? `
