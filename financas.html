@@ -2013,7 +2013,7 @@ Telas.config = {
           <button class="btn btn-prim" onclick="Telas.config.exportar()">⬇️ Exportar JSON</button>
           <button class="btn btn-ghost" onclick="document.getElementById('imp-file').click()">⬆️ Importar JSON</button>
         </div>
-        <input type="file" id="imp-file" accept=".json" style="display:none" onchange="Telas.config.importar(this)">
+        <input type="file" id="imp-file" accept=".json,.txt" style="display:none" onchange="Telas.config.importar(this)">
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -2231,7 +2231,7 @@ Router.init();
         </p>
         <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-ghost" onclick="document.getElementById('imp-file-bv').click()">⬆️ Importar backup agora</button>
-          <input type="file" id="imp-file-bv" accept=".json" style="display:none" onchange="Telas.config.importar(this);Modal.fechar()">
+          <input type="file" id="imp-file-bv" accept=".json,.txt" style="display:none" onchange="Telas.config.importar(this);Modal.fechar()">
         </div>`, { footer: false });
     }, 600);
   }
