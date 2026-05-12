@@ -556,7 +556,7 @@ const CATS_RECEITA = [
 ];
 
 function seed() {
-  const VERSAO = 'v20260511-3';
+  const VERSAO = 'v20260512-1';
   if (localStorage.getItem('ff_versao') === VERSAO) return;
   // Versão nova ou dados velhos — apaga tudo e carrega dados frescos
   Object.keys(localStorage).filter(k => k.startsWith('ff_')).forEach(k => localStorage.removeItem(k));
@@ -564,7 +564,8 @@ function seed() {
   Storage.salvarCategorias([{"id": "3a8fa33d-4ec5-47e9-8149-11f958c35047", "nome": "Alimentação / Mercado", "ico": "🛒", "cor": "#EF476F", "tipo": "despesa"}, {"id": "77182a61-b0eb-4594-bddf-d2568bf14d19", "nome": "Transporte / Combustível", "ico": "⛽", "cor": "#118AB2", "tipo": "despesa"}, {"id": "10330e70-31e9-4442-9907-e22049617121", "nome": "Lazer / Assinaturas", "ico": "🎮", "cor": "#6C63FF", "tipo": "despesa"}, {"id": "317ef697-b919-4eb4-8d72-91d4f586b3b3", "nome": "Jiu Jitsu", "ico": "🥋", "cor": "#FF6B6B", "tipo": "despesa"}, {"id": "b7da8646-6bfe-43a6-a3ce-41140743d2fb", "nome": "Cantina", "ico": "☕", "cor": "#4ECDC4", "tipo": "despesa"}, {"id": "f86ddf2a-c1f3-4a7b-85b3-9e756c9c1b4d", "nome": "Energético", "ico": "⚡", "cor": "#FFD166", "tipo": "despesa"}, {"id": "f5cc5919-4329-41c7-aee2-ff7b893d959b", "nome": "Conta de Água", "ico": "💧", "cor": "#45B7D1", "tipo": "despesa"}, {"id": "448a9dac-01d0-4e65-bbcf-9030a39e5b75", "nome": "Aluguel", "ico": "🏠", "cor": "#96CEB4", "tipo": "despesa"}, {"id": "61732de0-dc70-41f4-9913-85a259d5ee6a", "nome": "Telefone", "ico": "📱", "cor": "#FFEAA7", "tipo": "despesa"}, {"id": "d3c53fc7-ce1a-4dfe-8163-e5fff06d8dde", "nome": "Saúde / Farmácia", "ico": "💊", "cor": "#DDA0DD", "tipo": "despesa"}, {"id": "f7579f7e-ca4e-407a-9ebf-a2f9c5e34c9f", "nome": "Educação", "ico": "📚", "cor": "#98D8C8", "tipo": "despesa"}, {"id": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "nome": "Outros", "ico": "📦", "cor": "#06D6A0", "tipo": "despesa"}, {"id": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "nome": "Salário", "ico": "💼", "cor": "#06D6A0", "tipo": "receita"}, {"id": "6f619a69-044d-4400-a64c-77715a16b6a1", "nome": "Freelance", "ico": "💻", "cor": "#6C63FF", "tipo": "receita"}, {"id": "e0cabb72-5b1b-4169-83e6-dff1307609f3", "nome": "Investimentos", "ico": "📈", "cor": "#118AB2", "tipo": "receita"}, {"id": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "nome": "Outros (rec.)", "ico": "🎁", "cor": "#FFD166", "tipo": "receita"}]);
   Storage.salvarContas([{"id": "13d76a2e-6aee-43f0-a13c-4d332fed7648", "nome": "BTG Black", "banco": "BTG", "tipo": "investimento", "saldoInicial": 31.95, "cor": "#6C63FF", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "nome": "Bradesco", "banco": "Bradesco", "tipo": "corrente", "saldoInicial": 0, "cor": "#EF476F", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "54f23b3c-3c9f-46d1-bd0f-416375976b32", "nome": "Inter", "banco": "Inter", "tipo": "corrente", "saldoInicial": 0.18, "cor": "#06D6A0", "criadaEm": "2026-05-01T00:00:00.000Z"}]);
   Storage.salvarCartoes([{"id": "05a33bef-d7f1-4131-b92d-1f55abeb35c0", "nome": "Nubank", "banco": "Nubank", "limite": 800, "diaFechamento": 10, "diaVencimento": 15, "cor": "#EF476F", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "nome": "Inter Black", "banco": "Inter", "limite": 1126.2, "diaFechamento": 4, "diaVencimento": 10, "cor": "#06D6A0", "criadaEm": "2026-05-01T00:00:00.000Z"}]);
-  Storage.salvarTransacoes([{"id": "a799c031-126c-4dc7-b51f-5250480a7f71", "data": "2026-05-05", "descricao": "Salário", "valor": 460.0, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "3fbfb813-e6a9-4e7a-8c16-31a77fc37eac", "data": "2026-05-05", "descricao": "Mesada mãe", "valor": 580.0, "tipo": "receita", "categoria": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "9d2a20ee-b47d-4ec4-9873-0850f95972eb", "data": "2026-05-15", "descricao": "Salário Marista", "valor": 888.81, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "a3bac06b-3130-4f58-90ef-d9dcf190c66d", "data": "2026-04-24", "descricao": "Gastos Nubank — Fatura Mai/26", "valor": 771.51, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "05a33bef-d7f1-4131-b92d-1f55abeb35c0", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "1aee7244-889e-4ee3-b8ef-981aed6ce709", "data": "2026-05-05", "descricao": "Gastos Inter Black — Fatura Jun/26", "valor": 639.5, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "c48c02ac-6464-4e1d-9d86-6c383b3167fa", "data": "2026-05-05", "descricao": "Anuidade Inter Black", "valor": 45.0, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}]);
+  Storage.salvarTransacoes([{"id": "a799c031-126c-4dc7-b51f-5250480a7f71", "data": "2026-05-05", "descricao": "Salário", "valor": 460.0, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "3fbfb813-e6a9-4e7a-8c16-31a77fc37eac", "data": "2026-05-05", "descricao": "Mesada mãe", "valor": 580.0, "tipo": "receita", "categoria": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "9d2a20ee-b47d-4ec4-9873-0850f95972eb", "data": "2026-05-15", "descricao": "Salário Marista", "valor": 888.81, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "a3bac06b-3130-4f58-90ef-d9dcf190c66d", "data": "2026-04-24", "descricao": "Gastos Nubank — Fatura Mai/26", "valor": 771.51, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "05a33bef-d7f1-4131-b92d-1f55abeb35c0", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "1aee7244-889e-4ee3-b8ef-981aed6ce709", "data": "2026-05-05", "descricao": "Gastos Inter Black — Fatura Jun/26", "valor": 639.5, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}]);
+  Storage.salvarFixos([{"id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890", "descricao": "Anuidade Inter Black", "valor": 45.0, "dia": 5, "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "ativo": true}]);
   Storage.salvarMetaInvest(500);
 }
 
@@ -586,7 +587,7 @@ function verificarFixos() {
     const dataStr = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(fixo.dia).padStart(2,'0')}`;
     txs.push({ id: Utils.uuid(), data: dataStr, descricao: fixo.descricao, valor: fixo.valor,
       tipo: 'despesa', categoria: fixo.categoria, contaId: fixo.contaId || null,
-      cartaoId: null, contaDestinoId: null, parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null });
+      cartaoId: fixo.cartaoId || null, contaDestinoId: null, parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null });
     log.push({ fixoId: fixo.id, mesAno });
     inseriu = true;
   }
@@ -1718,7 +1719,7 @@ Telas.dashboard = {
       recTxHtml += `</div>`;
     }
     const totalCatDep = cats.reduce((a,c)=>a+c.total,0);
-    const totalFaturasFechadas = cartoes.reduce((acc, c) => acc + Fin.totalComprometido(c.id), 0);
+    const totalFaturasFechadas = cartoes.reduce((acc, c) => acc + Fin.faturaFechada(c.id), 0);
     const saldoLiquido = total - totalFaturasFechadas;
     const el = document.getElementById('tela-dashboard');
     el.innerHTML = `
@@ -2060,7 +2061,7 @@ Telas.config = {
               <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'}">${cat?.ico||'📦'}</div>
               <div class="lista-info">
                 <div class="lista-titulo">${Utils.esc(f.descricao)}</div>
-                <div class="lista-sub">${Utils.moeda(f.valor)} • Todo dia ${f.dia} • ${f.ativo?'Ativo':'Pausado'}</div>
+                <div class="lista-sub">${Utils.moeda(f.valor)} • Todo dia ${f.dia}${f.cartaoId ? ' • 💳 '+(Storage.cartoes().find(c=>c.id===f.cartaoId)?.nome||'') : f.contaId ? ' • 🏦 '+(Storage.contas().find(c=>c.id===f.contaId)?.nome||'') : ''} • ${f.ativo?'Ativo':'Pausado'}</div>
               </div>
               <div class="lista-acoes">
                 <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.config.editarFixo('${f.id}')">${f.ativo?'⏸️':'▶️'}</button>
@@ -2168,6 +2169,8 @@ Telas.config = {
     const catOpts = cats.map(c=>`<option value="${c.id}"${f?.categoria===c.id?' selected':''}>${c.ico} ${Utils.esc(c.nome)}</option>`).join('');
     const contaOpts = [`<option value="">Nenhuma</option>`,
       ...Storage.contas().map(c=>`<option value="${c.id}"${f?.contaId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
+    const cartaoOpts = [`<option value="">Nenhum</option>`,
+      ...Storage.cartoes().map(c=>`<option value="${c.id}"${f?.cartaoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
     Modal.abrir('Gasto Fixo Mensal', `
       <div class="form-grupo"><label>Descrição</label>
         <input id="gf-desc" type="text" placeholder="Ex: Aluguel" value="${Utils.esc(f?.descricao||'')}">
@@ -2179,7 +2182,8 @@ Telas.config = {
           <input id="gf-dia" type="number" min="1" max="28" placeholder="Ex: 5" value="${f?.dia||''}"></div>
       </div>
       <div class="form-grupo"><label>Categoria</label><select id="gf-cat">${catOpts}</select></div>
-      <div class="form-grupo"><label>Conta (opcional)</label><select id="gf-conta">${contaOpts}</select></div>`,
+      <div class="form-grupo"><label>Conta (opcional)</label><select id="gf-conta">${contaOpts}</select></div>
+      <div class="form-grupo"><label>Cartão (opcional)</label><select id="gf-cartao">${cartaoOpts}</select></div>`,
       { onOk: () => {
         const desc = document.getElementById('gf-desc').value.trim();
         if (!desc) { document.getElementById('gf-err').classList.add('vis'); return; }
@@ -2189,6 +2193,7 @@ Telas.config = {
           dia: parseInt(document.getElementById('gf-dia').value) || 1,
           categoria: document.getElementById('gf-cat').value,
           contaId: document.getElementById('gf-conta').value || null,
+          cartaoId: document.getElementById('gf-cartao').value || null,
           ativo: true
         };
         const arr = Storage.fixos();
