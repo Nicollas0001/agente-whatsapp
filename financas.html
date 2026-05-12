@@ -2096,8 +2096,8 @@ Telas.config = {
         const dados = JSON.parse(e.target.result);
         Modal.confirmar(`Isso substituirá TODOS os dados atuais. Continuar?`, () => {
           Storage.importar(dados);
-          toast(`Importado: ${dados.contas?.length||0} contas, ${dados.cartoes?.length||0} cartões, ${dados.transacoes?.length||0} lançamentos.`, 3500);
-          this.render();
+          setTimeout(() => location.reload(), 400);
+          toast(`Importado com sucesso! Recarregando...`, 1500);
         });
       } catch { toast('Arquivo inválido.'); }
     };
