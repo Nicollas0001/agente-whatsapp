@@ -2022,6 +2022,12 @@ Telas.config = {
         <input type="file" id="imp-file" accept=".json,.txt" style="display:none" onchange="Telas.config.importar(this)">
       </div>
 
+      <div class="card" style="margin-bottom:16px;border:2px solid var(--despesa)">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:8px">🔄 Restaurar Dados Padrão</h2>
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Apaga tudo e carrega as contas, cartões e lançamentos de maio que você configurou. Use quando os dados ficarem bagunçados.</p>
+        <button class="btn btn-perig" onclick="Telas.config.zerarERestaurar()">🗑️ Zerar e Restaurar</button>
+      </div>
+
       <div class="card" style="margin-bottom:16px">
         <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">🏷️ Categorias de Despesa</h2>
         <div id="cats-desp">
@@ -2083,6 +2089,15 @@ Telas.config = {
       <div style="text-align:center;font-size:11px;color:var(--txt2);padding:10px">
         Controle Financeiro Offline v1.0 • Dados salvos localmente
       </div>`;
+  },
+  zerarERestaurar() {
+    Modal.confirmar('Apagar TUDO e carregar os dados de maio (contas, cartões e receitas)?', () => {
+      // Clear all ff_ keys
+      Object.keys(localStorage).filter(k => k.startsWith('ff_')).forEach(k => localStorage.removeItem(k));
+      // Re-run seed with new data
+      seed();
+      setTimeout(() => { location.reload(); }, 300);
+    });
   },
   exportar() {
     const dados = Storage.exportar();
