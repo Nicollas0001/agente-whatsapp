@@ -877,6 +877,28 @@ const Fin = {
     }
     return { receitas, despesas, saldo: receitas - despesas };
   },
+  // Fluxo de caixa real: entradas = receitas; saídas = despesas pagas do banco + pagamentos de fatura
+  fluxoCaixa(mes, ano) {
+    let entradas = 0, saidas = 0;
+    for (const t of Storage.transacoes()) {
+      if (!Utils.datasNoMes(t.data, mes, ano)) continue;
+      if (t.tipo === 'receita') entradas += t.valor;
+      if (t.tipo === 'despesa' && t.contaId && !t.cartaoId) saidas += t.valor;
+      if (t.tipo === 'fatura_cartao') saidas += t.valor;
+    }
+    return { entradas, saidas, resultado: entradas - saidas };
+  },
+  resumoAnual(ano) {
+    let entradas = 0, saidas = 0;
+    for (const t of Storage.transacoes()) {
+      const d = new Date(t.data + 'T00:00:00');
+      if (d.getFullYear() !== ano) continue;
+      if (t.tipo === 'receita') entradas += t.valor;
+      if (t.tipo === 'despesa' && t.contaId && !t.cartaoId) saidas += t.valor;
+      if (t.tipo === 'fatura_cartao') saidas += t.valor;
+    }
+    return { entradas, saidas, resultado: entradas - saidas };
+  },
   despesasPorCategoria(mes, ano) {
     const mapa = {};
     for (const t of Storage.transacoes()) {
@@ -1641,13 +1663,41 @@ function executarImportarLote() {
 ═══════════════════════════════════════════════════════════ */
 Telas.dashboard = {
   _ref: Utils.mesAtual(),
+  _aba: 'mes',
+
   render() {
+    const el = document.getElementById('tela-dashboard');
     const { mes, ano } = this._ref;
-    const resumo  = Fin.resumoMensal(mes, ano);
-    const total   = Fin.saldoTotal();
+    const chatHtml = `
+      <div class="chat-wrap">
+        <div class="chat-historico" id="chat-hist" style="max-height:200px;overflow-y:auto"></div>
+        <div class="chat-input-row">
+          <textarea id="chat-txt" placeholder='Ex: gastei 50 no mercado&#10;recebi 3000 de salário&#10;investi 500 hoje' rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''}"></textarea>
+          <button class="chat-send" onclick="Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''">➤</button>
+        </div>
+      </div>`;
+    const tabBar = `
+      <div style="display:flex;gap:8px;margin:12px 0 4px">
+        <button class="tab-btn${this._aba==='mes'?' ativo':''}" onclick="Telas.dashboard._aba='mes';Telas.dashboard.render()">Este Mês</button>
+        <button class="tab-btn${this._aba==='balanco'?' ativo':''}" onclick="Telas.dashboard._aba='balanco';Telas.dashboard.render()">Balanço Geral</button>
+      </div>`;
+    const mesNav = `
+      <div class="mes-nav">
+        <button onclick="Telas.dashboard._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
+        <button onclick="Telas.dashboard._mudarMes(1)">▶</button>
+      </div>`;
+    if (this._aba === 'balanco') {
+      el.innerHTML = chatHtml + tabBar + this._htmlBalanco();
+      Chat.renderHistorico();
+      return;
+    }
+    // ── Este Mês ─────────────────────────────────────────────
+    const fluxo  = Fin.fluxoCaixa(mes, ano);
     const cartoes = Storage.cartoes();
-    const cats    = Fin.despesasPorCategoria(mes, ano);
-    const txs     = Storage.transacoes()
+    const cats   = Fin.despesasPorCategoria(mes, ano);
+    const txs    = Storage.transacoes()
       .filter(t => Utils.datasNoMes(t.data, mes, ano))
       .sort((a,b) => b.data.localeCompare(a.data))
       .slice(0, 10);
@@ -1655,33 +1705,32 @@ Telas.dashboard = {
     const contas  = Storage.contas();
     const carts   = Storage.cartoes();
 
-    // Alerta de investimento
     const meta = Storage.metaInvest();
     const investMes = Storage.investimentos()
       .filter(i => Utils.datasNoMes(i.data, mes, ano))
-      .reduce((a,i)=>a+i.valor, 0);
-    const sobra = resumo.receitas - resumo.despesas;
-    const podeGastar = sobra - (meta - investMes);
+      .reduce((a,i) => a+i.valor, 0);
+    const podeGastar = fluxo.resultado - (meta - investMes);
     let alertaHtml = '';
-    if (resumo.receitas > 0) {
+    if (fluxo.entradas > 0) {
       if (podeGastar < 0) {
-        alertaHtml = `<div class="alerta-invest critico">⚠️ <strong>Atenção!</strong> Com os gastos atuais, o investimento de ${Utils.moeda(meta)} este mês está comprometido em ${Utils.moeda(Math.abs(podeGastar))}.</div>`;
+        alertaHtml = `<div class="alerta-invest critico">⚠️ <strong>Atenção!</strong> Com as saídas atuais, o investimento de ${Utils.moeda(meta)} está comprometido em ${Utils.moeda(Math.abs(podeGastar))}.</div>`;
       } else if (podeGastar < meta * 0.3) {
         alertaHtml = `<div class="alerta-invest medio">⚡ Cuidado! Você ainda pode gastar <strong>${Utils.moeda(podeGastar)}</strong> sem comprometer o investimento de ${Utils.moeda(meta)}.</div>`;
       } else {
-        alertaHtml = `<div class="alerta-invest ok">✅ Tudo certo! Você pode gastar até <strong>${Utils.moeda(podeGastar)}</strong> e ainda investir ${Utils.moeda(meta)} este mês.</div>`;
+        alertaHtml = `<div class="alerta-invest ok">✅ Tudo certo! Pode gastar até <strong>${Utils.moeda(podeGastar)}</strong> e ainda investir ${Utils.moeda(meta)} este mês.</div>`;
       }
     }
+
     let cartoesHtml = '';
     if (cartoes.length) {
       cartoesHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Faturas dos Cartões</h2><div class="card-grid">`;
       for (const c of cartoes) {
         const { fechado, aberto } = Fin._periodosFatura(c);
-        const fatFec   = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
-        const fatAb    = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
-        const comprom  = Fin.totalComprometido(c.id);
-        const pctD     = c.limite ? Math.min(100, Math.round(comprom/c.limite*100)) : 0;
-        const clsD     = pctD<70?'barra-ok':pctD<90?'barra-med':'barra-alto';
+        const fatFec  = Fin.faturaCartao(c.id, fechado.mes, fechado.ano);
+        const fatAb   = Fin.faturaCartao(c.id, aberto.mes,  aberto.ano);
+        const comprom = Fin.totalComprometido(c.id);
+        const pctD    = c.limite ? Math.min(100, Math.round(comprom/c.limite*100)) : 0;
+        const clsD    = pctD<70?'barra-ok':pctD<90?'barra-med':'barra-alto';
         cartoesHtml += `<div class="card" style="border-left:4px solid ${Utils.esc(c.cor)}">
           <div style="font-weight:700;margin-bottom:8px">${Utils.esc(c.nome)}</div>
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
@@ -1696,6 +1745,7 @@ Telas.dashboard = {
       }
       cartoesHtml += `</div>`;
     }
+
     let recTxHtml = '';
     if (txs.length) {
       recTxHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Últimos Lançamentos</h2><div class="card">`;
@@ -1705,8 +1755,8 @@ Telas.dashboard = {
         const cat   = allCats.find(c=>c.id===t.categoria);
         const conta = contas.find(c=>c.id===t.contaId);
         const cart  = carts.find(c=>c.id===t.cartaoId);
-        const cor = t.tipo==='receita'?'var(--receita)':t.tipo==='despesa'?'var(--despesa)':'var(--txt2)';
-        const sinal = t.tipo==='receita'?'+':t.tipo==='despesa'?'-':'';
+        const cor   = t.tipo==='receita'?'var(--receita)':t.tipo==='fatura_cartao'?'var(--despesa)':t.tipo==='despesa'?'var(--despesa)':'var(--txt2)';
+        const sinal = t.tipo==='receita'?'+':'-';
         recTxHtml += `<div class="lista-item">
           <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'}">${cat?.ico||'📦'}</div>
           <div class="lista-info">
@@ -1718,37 +1768,27 @@ Telas.dashboard = {
       }
       recTxHtml += `</div>`;
     }
-    const totalCatDep = cats.reduce((a,c)=>a+c.total,0);
-    const totalFaturasFechadas = cartoes.reduce((acc, c) => acc + Fin.faturaFechada(c.id), 0);
-    const saldoLiquido = total - totalFaturasFechadas;
-    const el = document.getElementById('tela-dashboard');
-    el.innerHTML = `
-      <div class="chat-wrap">
-        <div class="chat-historico" id="chat-hist" style="max-height:200px;overflow-y:auto"></div>
-        <div class="chat-input-row">
-          <textarea id="chat-txt" placeholder='Ex: gastei 50 no mercado&#10;recebi 3000 de salário&#10;investi 500 hoje' rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''}"></textarea>
-          <button class="chat-send" onclick="Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''">➤</button>
+
+    const totalCatDep = cats.reduce((a,c) => a+c.total, 0);
+    const resCls = fluxo.resultado >= 0 ? 'pos' : 'neg';
+
+    el.innerHTML = chatHtml + alertaHtml + tabBar + mesNav + `
+      <div class="card-resumo" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card c-receita">
+          <div class="card-label">Entrou no mês</div>
+          <div class="card-valor pos">${Utils.moeda(fluxo.entradas)}</div>
+          <div style="font-size:10px;color:var(--txt2);margin-top:2px">receitas recebidas</div>
         </div>
-      </div>
-      ${alertaHtml}
-      <div class="mes-nav">
-        <button onclick="Telas.dashboard._mudarMes(-1)">◀</button>
-        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
-        <button onclick="Telas.dashboard._mudarMes(1)">▶</button>
-      </div>
-      <div class="card-resumo">
-        <div class="card"><div class="card-label">Saldo Contas</div>
-          <div class="card-valor ${total>=0?'pos':'neg'}">${Utils.moeda(total)}</div></div>
-        <div class="card" style="border-left:3px solid var(--despesa)"><div class="card-label">Faturas a Pagar</div>
-          <div class="card-valor neg">${Utils.moeda(totalFaturasFechadas)}</div></div>
-        <div class="card" style="border-left:3px solid #f5a623"><div class="card-label">Saldo Líquido</div>
-          <div class="card-label" style="font-size:10px;margin-bottom:2px">(contas − faturas)</div>
-          <div class="card-valor ${saldoLiquido>=0?'pos':'neg'}">${Utils.moeda(saldoLiquido)}</div></div>
-        <div class="card c-receita"><div class="card-label">Receitas</div>
-          <div class="card-valor pos">${Utils.moeda(resumo.receitas)}</div></div>
-        <div class="card c-despesa"><div class="card-label">Despesas</div>
-          <div class="card-valor neg">${Utils.moeda(resumo.despesas)}</div></div>
+        <div class="card c-despesa">
+          <div class="card-label">Saiu do banco</div>
+          <div class="card-valor neg">${Utils.moeda(fluxo.saidas)}</div>
+          <div style="font-size:10px;color:var(--txt2);margin-top:2px">pagamentos + faturas pagas</div>
+        </div>
+        <div class="card" style="border-left:3px solid ${fluxo.resultado>=0?'var(--receita)':'var(--despesa)'}">
+          <div class="card-label">Sobrou</div>
+          <div class="card-valor ${resCls}">${Utils.moeda(fluxo.resultado)}</div>
+          <div style="font-size:10px;color:var(--txt2);margin-top:2px">entrou − saiu</div>
+        </div>
       </div>
       ${cartoesHtml}
       ${cats.length ? `
@@ -1767,6 +1807,89 @@ Telas.dashboard = {
     if (cats.length) Graf.donut('cv-donut', cats, totalCatDep);
     Chat.renderHistorico();
   },
+
+  _htmlBalanco() {
+    const { mes, ano } = this._ref;
+    const total    = Fin.saldoTotal();
+    const cartoes  = Storage.cartoes();
+    const contas   = Storage.contas();
+    const fatFech  = cartoes.reduce((acc, c) => acc + Fin.faturaFechada(c.id), 0);
+    const saldoLiq = total - fatFech;
+    const anual    = Fin.resumoAnual(ano);
+    const mensal   = Fin.fluxoCaixa(mes, ano);
+
+    const contasHtml = contas.map(c => {
+      const saldo = Fin.saldoConta(c.id);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--borda)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${Utils.esc(c.cor)}"></div>
+          <span style="font-size:13px">${Utils.esc(c.nome)}</span>
+        </div>
+        <strong style="color:${saldo>=0?'var(--receita)':'var(--despesa)'}">${Utils.moeda(saldo)}</strong>
+      </div>`;
+    }).join('');
+
+    const mesNav = `
+      <div class="mes-nav" style="margin:0 0 16px">
+        <button onclick="Telas.dashboard._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
+        <button onclick="Telas.dashboard._mudarMes(1)">▶</button>
+      </div>`;
+
+    return `${mesNav}
+      <h2 style="font-size:14px;font-weight:700;margin:0 0 10px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px">Patrimônio Atual</h2>
+      <div class="card-resumo" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="card">
+          <div class="card-label">Saldo nas Contas</div>
+          <div class="card-valor ${total>=0?'pos':'neg'}">${Utils.moeda(total)}</div>
+        </div>
+        <div class="card" style="border-left:3px solid var(--despesa)">
+          <div class="card-label">Faturas a Pagar</div>
+          <div class="card-valor neg">${Utils.moeda(fatFech)}</div>
+        </div>
+        <div class="card" style="border-left:3px solid #f5a623">
+          <div class="card-label">Saldo Líquido</div>
+          <div class="card-label" style="font-size:10px;margin-bottom:2px">(contas − faturas)</div>
+          <div class="card-valor ${saldoLiq>=0?'pos':'neg'}">${Utils.moeda(saldoLiq)}</div>
+        </div>
+      </div>
+      ${contas.length ? `
+        <div class="card" style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px;color:var(--txt2)">Contas</div>
+          ${contasHtml}
+        </div>` : ''}
+      <h2 style="font-size:14px;font-weight:700;margin:0 0 10px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px">Ano ${ano} — Fluxo Acumulado</h2>
+      <div class="card-resumo" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="card c-receita">
+          <div class="card-label">Entrou no Ano</div>
+          <div class="card-valor pos">${Utils.moeda(anual.entradas)}</div>
+        </div>
+        <div class="card c-despesa">
+          <div class="card-label">Saiu no Ano</div>
+          <div class="card-valor neg">${Utils.moeda(anual.saidas)}</div>
+        </div>
+        <div class="card" style="border-left:3px solid ${anual.resultado>=0?'var(--receita)':'var(--despesa)'}">
+          <div class="card-label">Resultado ${ano}</div>
+          <div class="card-valor ${anual.resultado>=0?'pos':'neg'}">${Utils.moeda(anual.resultado)}</div>
+        </div>
+      </div>
+      <h2 style="font-size:14px;font-weight:700;margin:0 0 10px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px">${Utils.nomeMes(mes,ano)} — Fluxo do Mês</h2>
+      <div class="card-resumo" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card c-receita">
+          <div class="card-label">Entrou</div>
+          <div class="card-valor pos">${Utils.moeda(mensal.entradas)}</div>
+        </div>
+        <div class="card c-despesa">
+          <div class="card-label">Saiu</div>
+          <div class="card-valor neg">${Utils.moeda(mensal.saidas)}</div>
+        </div>
+        <div class="card" style="border-left:3px solid ${mensal.resultado>=0?'var(--receita)':'var(--despesa)'}">
+          <div class="card-label">Resultado</div>
+          <div class="card-valor ${mensal.resultado>=0?'pos':'neg'}">${Utils.moeda(mensal.resultado)}</div>
+        </div>
+      </div>`;
+  },
+
   _mudarMes(d) {
     this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d);
     this.render();
