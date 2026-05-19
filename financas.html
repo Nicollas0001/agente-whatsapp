@@ -381,6 +381,25 @@ canvas { display: block; }
 .alerta-invest.medio { background: rgba(255,209,102,.1);border-color: var(--aviso);   color: var(--aviso); }
 .alerta-invest.critico{ background: rgba(239,71,111,.1); border-color: var(--despesa); color: var(--despesa); }
 
+/* Fatura overlay */
+#fatura-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.78); z-index: 150;
+  align-items: center; justify-content: center; padding: 16px;
+}
+#fatura-overlay.aberto { display: flex; }
+#fatura-panel {
+  background: var(--sup); border-radius: 16px;
+  width: min(95vw, 700px); max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+#fatura-panel-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--borda);
+  display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;
+}
+#fatura-panel-corpo { overflow-y: auto; flex: 1; }
+
 /* ── INVEST PROGRESS ──────────────────────────────────── */
 .invest-progress { margin: 16px 0; }
 .invest-nums { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
@@ -429,6 +448,16 @@ canvas { display: block; }
     </div>
     <div id="modal-corpo"></div>
     <div id="modal-footer" style="display:none"></div>
+  </div>
+</div>
+
+<div id="fatura-overlay">
+  <div id="fatura-panel">
+    <div id="fatura-panel-header">
+      <div id="fatura-panel-info"></div>
+      <button onclick="FaturaDetalhe.fechar()" style="background:none;border:none;color:var(--txt2);font-size:20px;cursor:pointer;padding:0 0 0 12px;line-height:1">✕</button>
+    </div>
+    <div id="fatura-panel-corpo"></div>
   </div>
 </div>
 
@@ -985,6 +1014,93 @@ const Modal = {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   FATURA DETALHE  (overlay com lançamentos da fatura)
+═══════════════════════════════════════════════════════════ */
+const FaturaDetalhe = {
+  _cartaoId: null, _mes: null, _ano: null, _onAcao: null,
+
+  abrir(cartaoId, mes, ano) {
+    this._cartaoId = cartaoId; this._mes = mes; this._ano = ano;
+    this._render();
+    document.getElementById('fatura-overlay').classList.add('aberto');
+  },
+
+  fechar() {
+    document.getElementById('fatura-overlay').classList.remove('aberto');
+    this._onAcao = null;
+  },
+
+  _render() {
+    const cartao = Storage.cartoes().find(c => c.id === this._cartaoId);
+    if (!cartao) return;
+    const { inicio, fim, vencimento } = Fin.periodoFatura(cartao, this._mes, this._ano);
+    const txs = Fin.transacoesCartao(this._cartaoId, this._mes, this._ano)
+      .sort((a, b) => a.data.localeCompare(b.data));
+    const total = txs.reduce((s, t) => s + t.valor, 0);
+    const allCats = Storage.categorias();
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const label = `${meses[this._mes - 1]}/${String(this._ano).slice(-2)}`;
+    const fmtD = d => {
+      const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return Utils.formatarData(s);
+    };
+    document.getElementById('fatura-panel-info').innerHTML = `
+      <div style="font-size:16px;font-weight:700">${Utils.esc(cartao.nome)} — Fatura ${label}</div>
+      <div style="font-size:12px;color:var(--txt2);margin-top:4px">${fmtD(inicio)} até ${fmtD(fim)} · Vence dia ${vencimento.getDate()}</div>`;
+    const txHtml = txs.length ? txs.map(t => {
+      const cat = allCats.find(c => c.id === t.categoria);
+      const grp = t.parcelaGrupoId ? `'${t.parcelaGrupoId}'` : "''";
+      const parcInfo = t.parcelas > 1 ? ` <span style="color:var(--txt2);font-size:11px">(${t.parcelaAtual}/${t.parcelas})</span>` : '';
+      return `<div class="lista-item" style="padding:10px 20px">
+        <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'};flex-shrink:0">${cat?.ico||'📦'}</div>
+        <div class="lista-info">
+          <div class="lista-titulo">${Utils.esc(t.descricao)}${parcInfo}</div>
+          <div class="lista-sub">${Utils.formatarData(t.data)} · ${Utils.esc(cat?.nome||'')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-weight:700;color:var(--despesa)">${Utils.moeda(t.valor)}</span>
+          <button class="btn btn-ghost btn-sm" onclick="FaturaDetalhe._editar('${t.id}')" title="Editar">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="FaturaDetalhe._excluir('${t.id}',${grp})" title="Excluir">🗑️</button>
+        </div>
+      </div>`;
+    }).join('') : `<div style="color:var(--txt2);text-align:center;padding:28px">Nenhum lançamento nesta fatura</div>`;
+
+    document.getElementById('fatura-panel-corpo').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px 8px;border-bottom:1px solid var(--borda)">
+        <span style="color:var(--txt2);font-size:13px">${txs.length} lançamento${txs.length !== 1 ? 's' : ''}</span>
+        <strong style="font-size:18px;color:${total>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(total)}</strong>
+      </div>
+      ${txHtml}
+      <div style="padding:14px 20px">
+        <button class="btn btn-ghost" style="width:100%" onclick="FaturaDetalhe._adicionar()">+ Adicionar lançamento nesta fatura</button>
+      </div>`;
+  },
+
+  _editar(txId) {
+    this._onAcao = () => this._render();
+    Telas.lancamentos._form(txId);
+  },
+
+  _excluir(txId, grupoId) {
+    this._onAcao = () => this._render();
+    Telas.lancamentos.excluir(txId, grupoId);
+  },
+
+  _adicionar() {
+    const cid = this._cartaoId;
+    this._onAcao = () => this._render();
+    Telas.lancamentos._form(null, 'despesa');
+    setTimeout(() => {
+      const sel = document.getElementById('tx-cart-desp');
+      if (sel) sel.value = cid;
+      // clear conta so card is the target
+      const conta = document.getElementById('tx-conta-desp');
+      if (conta) conta.value = '';
+    }, 60);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
    GRÁFICOS  (Canvas 2D puro)
 ═══════════════════════════════════════════════════════════ */
 const Graf = {
@@ -1189,13 +1305,13 @@ Telas.cartoes = {
             <div style="text-align:right;font-size:11px;color:var(--txt2)">
               Fecha dia ${c.diaFechamento}<br>Vence dia ${c.diaVencimento}</div>
           </div>
-          <div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between">
+          <div onclick="FaturaDetalhe.abrir('${c.id}',${fechado.mes},${fechado.ano})" style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between;cursor:pointer;padding:4px 6px;margin:-4px -6px 3px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
             <span style="color:var(--txt2)">🔴 A pagar (vence ${c.diaVencimento}/${String(fechado.mes).padStart(2,'0')})</span>
-            <strong style="color:${fatFechada>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFechada)}</strong>
+            <strong style="color:${fatFechada>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFechada)} ›</strong>
           </div>
-          <div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between">
+          <div onclick="FaturaDetalhe.abrir('${c.id}',${aberto.mes},${aberto.ano})" style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between;cursor:pointer;padding:4px 6px;margin:-4px -6px 3px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
             <span style="color:var(--txt2)">🟡 Em aberto (fecha ${c.diaFechamento}/${String(aberto.mes).padStart(2,'0')})</span>
-            <strong style="color:${fatAberta>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAberta)}</strong>
+            <strong style="color:${fatAberta>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAberta)} ›</strong>
           </div>
           ${parcelasProx>0?`<div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between">
             <span style="color:var(--txt2)">🔵 Parcelas futuras</span>
@@ -1523,6 +1639,7 @@ Telas.lancamentos = {
       }
       Storage.salvarTransacoes(arr);
       Modal.fechar(); this._renderLista(); toast('Lançamento atualizado!');
+      if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
       return;
     }
     // Novo lançamento
@@ -1557,6 +1674,7 @@ Telas.lancamentos = {
     Storage.salvarTransacoes(arr);
     Modal.fechar(); this._renderLista();
     toast(parcelas>1 ? `${parcelas} parcelas criadas!` : 'Lançamento salvo!');
+    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
   },
   excluir(id, grupoId) {
     if (grupoId) {
@@ -1574,17 +1692,20 @@ Telas.lancamentos = {
     Modal.confirmar('Excluir este lançamento?', () => {
       Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
       this._renderLista(); toast('Lançamento excluído.');
+      if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
     });
   },
   _excluirUm(id) {
     Modal.fechar();
     Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
     this._renderLista(); toast('Parcela excluída.');
+    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
   },
   _excluirGrupo(grupoId) {
     Modal.fechar();
     Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.parcelaGrupoId!==grupoId));
     this._renderLista(); toast('Parcelas excluídas.');
+    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
   }
 };
 
@@ -1733,12 +1854,12 @@ Telas.dashboard = {
         const clsD    = pctD<70?'barra-ok':pctD<90?'barra-med':'barra-alto';
         cartoesHtml += `<div class="card" style="border-left:4px solid ${Utils.esc(c.cor)}">
           <div style="font-weight:700;margin-bottom:8px">${Utils.esc(c.nome)}</div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+          <div onclick="FaturaDetalhe.abrir('${c.id}',${fechado.mes},${fechado.ano})" style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;cursor:pointer;padding:4px 6px;margin:-4px -6px 2px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
             <span style="color:var(--txt2)">🔴 A pagar (vence ${c.diaVencimento}/${String(fechado.mes).padStart(2,'0')})</span>
-            <strong style="color:${fatFec>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFec)}</strong></div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <strong style="color:${fatFec>0?'var(--despesa)':'var(--txt2)'}">${Utils.moeda(fatFec)} ›</strong></div>
+          <div onclick="FaturaDetalhe.abrir('${c.id}',${aberto.mes},${aberto.ano})" style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;cursor:pointer;padding:4px 6px;margin:-4px -6px 4px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
             <span style="color:var(--txt2)">🟡 Em aberto (fecha ${c.diaFechamento}/${String(aberto.mes).padStart(2,'0')})</span>
-            <strong style="color:${fatAb>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAb)}</strong></div>
+            <strong style="color:${fatAb>0?'#f5a623':'var(--txt2)'}">${Utils.moeda(fatAb)} ›</strong></div>
           <div class="barra-wrap"><div class="barra-fill ${clsD}" style="width:${pctD}%"></div></div>
           <div style="font-size:12px;color:var(--txt2)">Disponível real: <strong style="color:${(c.limite-comprom)>=0?'var(--receita)':'var(--despesa)'}">${Utils.moeda(c.limite-comprom)}</strong></div>
         </div>`;
