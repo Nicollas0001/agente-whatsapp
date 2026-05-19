@@ -1328,11 +1328,18 @@ const Router = {
 const Telas = {};
 
 Telas.contas = {
+  _ref: Utils.mesAtual(),
   render() {
+    const { mes, ano } = this._ref;
     const contas = Storage.contas();
     const el = document.getElementById('tela-contas');
     let html = `<div class="sec-header"><h1 class="sec-titulo">🏦 Contas</h1>
-      <button class="btn btn-prim btn-sm" onclick="Telas.contas.novo()">+ Nova</button></div>`;
+      <button class="btn btn-prim btn-sm" onclick="Telas.contas.novo()">+ Nova</button></div>
+      <div class="mes-nav">
+        <button onclick="Telas.contas._mudarMes(-1)">◀</button>
+        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
+        <button onclick="Telas.contas._mudarMes(1)">▶</button>
+      </div>`;
     if (!contas.length) {
       html += `<div class="vazio"><div class="vazio-ico">🏦</div><p>Nenhuma conta ainda.<br>Adicione sua primeira conta!</p></div>`;
     } else {
@@ -1342,16 +1349,32 @@ Telas.contas = {
         const saldo = Fin.saldoConta(c.id);
         const pos = saldo >= 0;
         const badgeClass = `badge-${c.tipo}`;
+        const txsMes = Storage.transacoes().filter(t =>
+          Utils.datasNoMes(t.data, mes, ano) &&
+          (t.contaId === c.id || t.contaDestinoId === c.id)
+        );
+        const entMes = txsMes.filter(t => t.tipo==='receita' || t.contaDestinoId===c.id).reduce((s,t)=>s+t.valor,0);
+        const saiMes = txsMes.filter(t => (t.tipo==='despesa'||t.tipo==='fatura_cartao'||(t.tipo==='transferencia'&&t.contaId===c.id))).reduce((s,t)=>s+t.valor,0);
         html += `<div class="card card-conta" style="border-top-color:${Utils.esc(c.cor)}">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div>
               <div style="font-size:16px;font-weight:700">${Utils.esc(c.nome)}</div>
               <div style="font-size:12px;color:var(--txt2)">${Utils.esc(c.banco)}</div>
             </div>
             <span class="badge ${badgeClass}">${c.tipo}</span>
           </div>
-          <div class="card-valor ${pos?'pos':'neg'}">${Utils.moeda(saldo)}</div>
-          <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+          <div style="font-size:11px;color:var(--txt2);margin-bottom:2px">Saldo atual</div>
+          <div class="card-valor ${pos?'pos':'neg'}" style="margin-bottom:10px">${Utils.moeda(saldo)}</div>
+          <div style="border-top:1px solid var(--borda);padding-top:8px;margin-bottom:10px">
+            <div style="font-size:11px;color:var(--txt2);margin-bottom:5px">${Utils.nomeMes(mes,ano)}</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px">
+              <span style="color:var(--receita)">↑ ${Utils.moeda(entMes)}</span>
+              <span style="color:var(--txt2)">${txsMes.length} mov.</span>
+              <span style="color:var(--despesa)">↓ ${Utils.moeda(saiMes)}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="ContaDetalhe.abrir('${c.id}',${mes},${ano})">📋 Ver</button>
             <button class="btn btn-ghost btn-sm" onclick="Telas.contas.editar('${c.id}')">✏️ Editar</button>
             <button class="btn btn-ghost btn-sm" onclick="Telas.contas.excluir('${c.id}')">🗑️</button>
           </div>
@@ -1364,6 +1387,10 @@ Telas.contas = {
       </div>`;
     }
     el.innerHTML = html;
+  },
+  _mudarMes(d) {
+    this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d);
+    this.render();
   },
   novo() { this._form(null); },
   editar(id) { this._form(id); },
@@ -2242,11 +2269,11 @@ Telas.relatorios = {
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txt2);padding-bottom:10px;border-bottom:1px solid var(--borda);margin-bottom:6px">
         <span>Total de despesas</span><strong style="color:var(--despesa)">${Utils.moeda(totalDep)}</strong></div>
-      ${desp.map(c=>`<div class="rel-linha">
+      ${desp.map(c=>`<div class="rel-linha" style="cursor:pointer" onclick="CatDetalhe.abrir('${c.id}',${mes},${ano})">
         <div class="rel-nome">${c.ico} ${Utils.esc(c.nome)}</div>
         <div class="rel-barra-wrap"><div class="rel-barra" style="width:${c.total/max*100}%;background:${c.cor}"></div></div>
         <div class="rel-val" style="color:var(--despesa)">${Utils.moeda(c.total)}</div>
-        <div class="rel-pct">${c.pct}%</div>
+        <div class="rel-pct">${c.pct}% ›</div>
       </div>`).join('')}
     </div>`;
   },
