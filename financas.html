@@ -585,12 +585,12 @@ const CATS_RECEITA = [
 ];
 
 function seed() {
-  const VERSAO = 'v20260512-1';
+  const VERSAO = 'v20260515-1';
   if (localStorage.getItem('ff_versao') === VERSAO) return;
   // Versão nova ou dados velhos — apaga tudo e carrega dados frescos
   Object.keys(localStorage).filter(k => k.startsWith('ff_')).forEach(k => localStorage.removeItem(k));
   localStorage.setItem('ff_versao', VERSAO);
-  Storage.salvarCategorias([{"id": "3a8fa33d-4ec5-47e9-8149-11f958c35047", "nome": "Alimentação / Mercado", "ico": "🛒", "cor": "#EF476F", "tipo": "despesa"}, {"id": "77182a61-b0eb-4594-bddf-d2568bf14d19", "nome": "Transporte / Combustível", "ico": "⛽", "cor": "#118AB2", "tipo": "despesa"}, {"id": "10330e70-31e9-4442-9907-e22049617121", "nome": "Lazer / Assinaturas", "ico": "🎮", "cor": "#6C63FF", "tipo": "despesa"}, {"id": "317ef697-b919-4eb4-8d72-91d4f586b3b3", "nome": "Jiu Jitsu", "ico": "🥋", "cor": "#FF6B6B", "tipo": "despesa"}, {"id": "b7da8646-6bfe-43a6-a3ce-41140743d2fb", "nome": "Cantina", "ico": "☕", "cor": "#4ECDC4", "tipo": "despesa"}, {"id": "f86ddf2a-c1f3-4a7b-85b3-9e756c9c1b4d", "nome": "Energético", "ico": "⚡", "cor": "#FFD166", "tipo": "despesa"}, {"id": "f5cc5919-4329-41c7-aee2-ff7b893d959b", "nome": "Conta de Água", "ico": "💧", "cor": "#45B7D1", "tipo": "despesa"}, {"id": "448a9dac-01d0-4e65-bbcf-9030a39e5b75", "nome": "Aluguel", "ico": "🏠", "cor": "#96CEB4", "tipo": "despesa"}, {"id": "61732de0-dc70-41f4-9913-85a259d5ee6a", "nome": "Telefone", "ico": "📱", "cor": "#FFEAA7", "tipo": "despesa"}, {"id": "d3c53fc7-ce1a-4dfe-8163-e5fff06d8dde", "nome": "Saúde / Farmácia", "ico": "💊", "cor": "#DDA0DD", "tipo": "despesa"}, {"id": "f7579f7e-ca4e-407a-9ebf-a2f9c5e34c9f", "nome": "Educação", "ico": "📚", "cor": "#98D8C8", "tipo": "despesa"}, {"id": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "nome": "Outros", "ico": "📦", "cor": "#06D6A0", "tipo": "despesa"}, {"id": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "nome": "Salário", "ico": "💼", "cor": "#06D6A0", "tipo": "receita"}, {"id": "6f619a69-044d-4400-a64c-77715a16b6a1", "nome": "Freelance", "ico": "💻", "cor": "#6C63FF", "tipo": "receita"}, {"id": "e0cabb72-5b1b-4169-83e6-dff1307609f3", "nome": "Investimentos", "ico": "📈", "cor": "#118AB2", "tipo": "receita"}, {"id": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "nome": "Outros (rec.)", "ico": "🎁", "cor": "#FFD166", "tipo": "receita"}]);
+  Storage.salvarCategorias([{"id": "3a8fa33d-4ec5-47e9-8149-11f958c35047", "nome": "Alimentação / Mercado", "ico": "🛒", "cor": "#EF476F", "tipo": "despesa"}, {"id": "77182a61-b0eb-4594-bddf-d2568bf14d19", "nome": "Transporte / Combustível", "ico": "⛽", "cor": "#118AB2", "tipo": "despesa"}, {"id": "10330e70-31e9-4442-9907-e22049617121", "nome": "Lazer / Assinaturas", "ico": "🎮", "cor": "#6C63FF", "tipo": "despesa"}, {"id": "317ef697-b919-4eb4-8d72-91d4f586b3b3", "nome": "Jiu Jitsu", "ico": "🥋", "cor": "#FF6B6B", "tipo": "despesa"}, {"id": "b7da8646-6bfe-43a6-a3ce-41140743d2fb", "nome": "Cantina", "ico": "☕", "cor": "#4ECDC4", "tipo": "despesa"}, {"id": "f86ddf2a-c1f3-4a7b-85b3-9e756c9c1b4d", "nome": "Energético", "ico": "⚡", "cor": "#FFD166", "tipo": "despesa"}, {"id": "f5cc5919-4329-41c7-aee2-ff7b893d959b", "nome": "Conta de Água", "ico": "💧", "cor": "#45B7D1", "tipo": "despesa"}, {"id": "448a9dac-01d0-4e65-bbcf-9030a39e5b75", "nome": "Aluguel", "ico": "🏠", "cor": "#96CEB4", "tipo": "despesa"}, {"id": "61732de0-dc70-41f4-9913-85a259d5ee6a", "nome": "Telefone", "ico": "📱", "cor": "#FFEAA7", "tipo": "despesa"}, {"id": "d3c53fc7-ce1a-4dfe-8163-e5fff06d8dde", "nome": "Saúde / Farmácia", "ico": "💊", "cor": "#DDA0DD", "tipo": "despesa"}, {"id": "f7579f7e-ca4e-407a-9ebf-a2f9c5e34c9f", "nome": "Educação", "ico": "📚", "cor": "#98D8C8", "tipo": "despesa"}, {"id": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "nome": "Outros", "ico": "📦", "cor": "#06D6A0", "tipo": "despesa"}, {"id": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "nome": "Salário", "ico": "💼", "cor": "#06D6A0", "tipo": "receita"}, {"id": "6f619a69-044d-4400-a64c-77715a16b6a1", "nome": "Freelance", "ico": "💻", "cor": "#6C63FF", "tipo": "receita"}, {"id": "e0cabb72-5b1b-4169-83e6-dff1307609f3", "nome": "Investimentos", "ico": "📈", "cor": "#118AB2", "tipo": "receita"}, {"id": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "nome": "Outros (rec.)", "ico": "🎁", "cor": "#FFD166", "tipo": "receita"}, {"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "nome": "Empréstimo", "ico": "💸", "cor": "#E74C3C", "tipo": "despesa"}]);
   Storage.salvarContas([{"id": "13d76a2e-6aee-43f0-a13c-4d332fed7648", "nome": "BTG Black", "banco": "BTG", "tipo": "investimento", "saldoInicial": 31.95, "cor": "#6C63FF", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "nome": "Bradesco", "banco": "Bradesco", "tipo": "corrente", "saldoInicial": 0, "cor": "#EF476F", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "54f23b3c-3c9f-46d1-bd0f-416375976b32", "nome": "Inter", "banco": "Inter", "tipo": "corrente", "saldoInicial": 0.18, "cor": "#06D6A0", "criadaEm": "2026-05-01T00:00:00.000Z"}]);
   Storage.salvarCartoes([{"id": "05a33bef-d7f1-4131-b92d-1f55abeb35c0", "nome": "Nubank", "banco": "Nubank", "limite": 800, "diaFechamento": 10, "diaVencimento": 15, "cor": "#EF476F", "criadaEm": "2026-05-01T00:00:00.000Z"}, {"id": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "nome": "Inter Black", "banco": "Inter", "limite": 1126.2, "diaFechamento": 4, "diaVencimento": 10, "cor": "#06D6A0", "criadaEm": "2026-05-01T00:00:00.000Z"}]);
   Storage.salvarTransacoes([{"id": "a799c031-126c-4dc7-b51f-5250480a7f71", "data": "2026-05-05", "descricao": "Salário", "valor": 460.0, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "3fbfb813-e6a9-4e7a-8c16-31a77fc37eac", "data": "2026-05-05", "descricao": "Mesada mãe", "valor": 580.0, "tipo": "receita", "categoria": "4daadfdf-ff01-40ea-9f07-0c09abb00c23", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "9d2a20ee-b47d-4ec4-9873-0850f95972eb", "data": "2026-05-15", "descricao": "Salário Marista", "valor": 888.81, "tipo": "receita", "categoria": "887b31b0-a657-46d2-a3cb-a264c6fbc095", "contaId": "53e61ce4-76bf-42b4-a876-a85ba06bc7a2", "cartaoId": null, "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "a3bac06b-3130-4f58-90ef-d9dcf190c66d", "data": "2026-04-24", "descricao": "Gastos Nubank — Fatura Mai/26", "valor": 771.51, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "05a33bef-d7f1-4131-b92d-1f55abeb35c0", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}, {"id": "1aee7244-889e-4ee3-b8ef-981aed6ce709", "data": "2026-05-05", "descricao": "Gastos Inter Black — Fatura Jun/26", "valor": 639.5, "tipo": "despesa", "categoria": "9fecc10c-73c3-4052-8595-e0ae8ee03d2b", "contaId": null, "cartaoId": "14972044-7eb3-4bf4-ad3e-5d9e7d93bebe", "contaDestinoId": null, "parcelas": 1, "parcelaAtual": 1, "parcelaGrupoId": null}]);
@@ -1017,7 +1017,7 @@ const Modal = {
    FATURA DETALHE  (overlay com lançamentos da fatura)
 ═══════════════════════════════════════════════════════════ */
 const FaturaDetalhe = {
-  _cartaoId: null, _mes: null, _ano: null, _onAcao: null,
+  _cartaoId: null, _mes: null, _ano: null,
 
   abrir(cartaoId, mes, ano) {
     this._cartaoId = cartaoId; this._mes = mes; this._ano = ano;
@@ -1027,7 +1027,7 @@ const FaturaDetalhe = {
 
   fechar() {
     document.getElementById('fatura-overlay').classList.remove('aberto');
-    this._onAcao = null;
+    _painelRefresh = null;
   },
 
   _render() {
@@ -1077,18 +1077,18 @@ const FaturaDetalhe = {
   },
 
   _editar(txId) {
-    this._onAcao = () => this._render();
+    _painelRefresh = () => this._render();
     Telas.lancamentos._form(txId);
   },
 
   _excluir(txId, grupoId) {
-    this._onAcao = () => this._render();
+    _painelRefresh = () => this._render();
     Telas.lancamentos.excluir(txId, grupoId);
   },
 
   _adicionar() {
     const cid = this._cartaoId;
-    this._onAcao = () => this._render();
+    _painelRefresh = () => this._render();
     Telas.lancamentos._form(null, 'despesa');
     setTimeout(() => {
       const sel = document.getElementById('tx-cart-desp');
@@ -1096,6 +1096,151 @@ const FaturaDetalhe = {
       // clear conta so card is the target
       const conta = document.getElementById('tx-conta-desp');
       if (conta) conta.value = '';
+    }, 60);
+  }
+};
+
+let _painelRefresh = null;
+
+const CatDetalhe = {
+  _catId: null, _mes: null, _ano: null,
+  abrir(catId, mes, ano) {
+    this._catId = catId; this._mes = mes; this._ano = ano;
+    this._render();
+    document.getElementById('fatura-overlay').classList.add('aberto');
+  },
+  fechar() {
+    document.getElementById('fatura-overlay').classList.remove('aberto');
+    _painelRefresh = null;
+  },
+  _render() {
+    const cat = Storage.categorias().find(c => c.id === this._catId);
+    if (!cat) return;
+    const allCats = Storage.categorias();
+    const contas = Storage.contas();
+    const cartoes = Storage.cartoes();
+    let txs = Storage.transacoes().filter(t => t.categoria === this._catId);
+    if (this._mes) txs = txs.filter(t => Utils.datasNoMes(t.data, this._mes, this._ano));
+    txs.sort((a,b) => a.data.localeCompare(b.data));
+    const total = txs.reduce((s,t) => s+t.valor, 0);
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const periodo = this._mes ? `${meses[this._mes-1]}/${String(this._ano).slice(-2)}` : 'Todo o período';
+    document.getElementById('fatura-panel-info').innerHTML = `
+      <div style="font-size:16px;font-weight:700">${cat.ico} ${Utils.esc(cat.nome)}</div>
+      <div style="font-size:12px;color:var(--txt2);margin-top:4px">${periodo}</div>`;
+    const corTotal = cat.tipo === 'receita' ? 'var(--receita)' : 'var(--despesa)';
+    const txHtml = txs.length ? txs.map(t => {
+      const conta = contas.find(c => c.id === t.contaId);
+      const cart  = cartoes.find(c => c.id === t.cartaoId);
+      const grp = t.parcelaGrupoId ? `'${t.parcelaGrupoId}'` : "''";
+      const cor = t.tipo === 'receita' ? 'var(--receita)' : 'var(--despesa)';
+      const sinal = t.tipo === 'receita' ? '+' : '-';
+      return `<div class="lista-item" style="padding:10px 20px">
+        <div class="lista-info">
+          <div class="lista-titulo">${Utils.esc(t.descricao)}</div>
+          <div class="lista-sub">${Utils.formatarData(t.data)} · ${Utils.esc(cart?.nome||conta?.nome||t.tipo)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-weight:700;color:${cor}">${sinal}${Utils.moeda(t.valor)}</span>
+          <button class="btn btn-ghost btn-sm" onclick="CatDetalhe._editar('${t.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="CatDetalhe._excluir('${t.id}',${grp})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('') : `<div style="color:var(--txt2);text-align:center;padding:28px">Nenhum lançamento nesta categoria</div>`;
+    document.getElementById('fatura-panel-corpo').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px 8px;border-bottom:1px solid var(--borda)">
+        <span style="color:var(--txt2);font-size:13px">${txs.length} lançamento${txs.length!==1?'s':''}</span>
+        <strong style="font-size:18px;color:${corTotal}">${Utils.moeda(total)}</strong>
+      </div>
+      ${txHtml}
+      <div style="padding:14px 20px">
+        <button class="btn btn-ghost" style="width:100%" onclick="CatDetalhe._adicionar()">+ Adicionar lançamento nesta categoria</button>
+      </div>`;
+  },
+  _editar(txId) { _painelRefresh = () => this._render(); Telas.lancamentos._form(txId); },
+  _excluir(txId, grp) { _painelRefresh = () => this._render(); Telas.lancamentos.excluir(txId, grp); },
+  _adicionar() {
+    const catId = this._catId;
+    const cat = Storage.categorias().find(c => c.id === catId);
+    const tipo = cat?.tipo === 'receita' ? 'receita' : 'despesa';
+    _painelRefresh = () => this._render();
+    Telas.lancamentos._form(null, tipo);
+    setTimeout(() => {
+      const sel = document.getElementById(tipo==='receita'?'tx-cat-rec':'tx-cat-desp');
+      if (sel) sel.value = catId;
+    }, 60);
+  }
+};
+
+const ContaDetalhe = {
+  _contaId: null, _mes: null, _ano: null,
+  abrir(contaId, mes, ano) {
+    this._contaId = contaId; this._mes = mes; this._ano = ano;
+    this._render();
+    document.getElementById('fatura-overlay').classList.add('aberto');
+  },
+  fechar() {
+    document.getElementById('fatura-overlay').classList.remove('aberto');
+    _painelRefresh = null;
+  },
+  _render() {
+    const conta = Storage.contas().find(c => c.id === this._contaId);
+    if (!conta) return;
+    const allCats = Storage.categorias();
+    const cartoes = Storage.cartoes();
+    let txs = Storage.transacoes().filter(t => {
+      const ok = t.contaId === this._contaId || t.contaDestinoId === this._contaId;
+      return ok && (this._mes ? Utils.datasNoMes(t.data, this._mes, this._ano) : true);
+    });
+    txs.sort((a,b) => a.data.localeCompare(b.data));
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const periodo = this._mes ? `${meses[this._mes-1]}/${String(this._ano).slice(-2)}` : 'Todo o período';
+    const saldoAtual = Fin.saldoConta(this._contaId);
+    document.getElementById('fatura-panel-info').innerHTML = `
+      <div style="font-size:16px;font-weight:700">${Utils.esc(conta.nome)}</div>
+      <div style="font-size:12px;color:var(--txt2);margin-top:4px">${Utils.esc(conta.banco)} · ${periodo} · Saldo atual: <strong style="color:${saldoAtual>=0?'var(--receita)':'var(--despesa)'}">${Utils.moeda(saldoAtual)}</strong></div>`;
+    const entradasMes = txs.filter(t => t.tipo==='receita' || t.contaDestinoId===this._contaId).reduce((s,t)=>s+t.valor,0);
+    const saidasMes   = txs.filter(t => (t.tipo==='despesa'||t.tipo==='fatura_cartao'||(t.tipo==='transferencia'&&t.contaId===this._contaId))).reduce((s,t)=>s+t.valor,0);
+    const txHtml = txs.length ? txs.map(t => {
+      const cat  = allCats.find(c => c.id === t.categoria);
+      const cart = cartoes.find(c => c.id === t.cartaoId);
+      const grp  = t.parcelaGrupoId ? `'${t.parcelaGrupoId}'` : "''";
+      const isEntrada = t.tipo==='receita' || t.contaDestinoId===this._contaId;
+      const cor   = isEntrada ? 'var(--receita)' : 'var(--despesa)';
+      const sinal = isEntrada ? '+' : '-';
+      return `<div class="lista-item" style="padding:10px 20px">
+        <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'};flex-shrink:0">${cat?.ico||'📦'}</div>
+        <div class="lista-info">
+          <div class="lista-titulo">${Utils.esc(t.descricao)}</div>
+          <div class="lista-sub">${Utils.formatarData(t.data)} · ${Utils.esc(cat?.nome||cart?.nome||t.tipo)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-weight:700;color:${cor}">${sinal}${Utils.moeda(t.valor)}</span>
+          <button class="btn btn-ghost btn-sm" onclick="ContaDetalhe._editar('${t.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="ContaDetalhe._excluir('${t.id}',${grp})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('') : `<div style="color:var(--txt2);text-align:center;padding:28px">Nenhum lançamento neste período</div>`;
+    document.getElementById('fatura-panel-corpo').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px 8px;border-bottom:1px solid var(--borda)">
+        <span style="color:var(--receita);font-size:13px">+${Utils.moeda(entradasMes)}</span>
+        <span style="color:var(--txt2);font-size:13px">${txs.length} mov.</span>
+        <span style="color:var(--despesa);font-size:13px">-${Utils.moeda(saidasMes)}</span>
+      </div>
+      ${txHtml}
+      <div style="padding:14px 20px">
+        <button class="btn btn-ghost" style="width:100%" onclick="ContaDetalhe._adicionar()">+ Adicionar lançamento nesta conta</button>
+      </div>`;
+  },
+  _editar(txId) { _painelRefresh = () => this._render(); Telas.lancamentos._form(txId); },
+  _excluir(txId, grp) { _painelRefresh = () => this._render(); Telas.lancamentos.excluir(txId, grp); },
+  _adicionar() {
+    const contaId = this._contaId;
+    _painelRefresh = () => this._render();
+    Telas.lancamentos._form(null, 'despesa');
+    setTimeout(() => {
+      const sel = document.getElementById('tx-conta-desp');
+      if (sel) sel.value = contaId;
     }, 60);
   }
 };
@@ -1639,7 +1784,7 @@ Telas.lancamentos = {
       }
       Storage.salvarTransacoes(arr);
       Modal.fechar(); this._renderLista(); toast('Lançamento atualizado!');
-      if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
+      if (_painelRefresh) { _painelRefresh(); _painelRefresh = null; }
       return;
     }
     // Novo lançamento
@@ -1674,7 +1819,7 @@ Telas.lancamentos = {
     Storage.salvarTransacoes(arr);
     Modal.fechar(); this._renderLista();
     toast(parcelas>1 ? `${parcelas} parcelas criadas!` : 'Lançamento salvo!');
-    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
+    if (_painelRefresh) { _painelRefresh(); _painelRefresh = null; }
   },
   excluir(id, grupoId) {
     if (grupoId) {
@@ -1692,20 +1837,20 @@ Telas.lancamentos = {
     Modal.confirmar('Excluir este lançamento?', () => {
       Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
       this._renderLista(); toast('Lançamento excluído.');
-      if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
+      if (_painelRefresh) { _painelRefresh(); _painelRefresh = null; }
     });
   },
   _excluirUm(id) {
     Modal.fechar();
     Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.id!==id));
     this._renderLista(); toast('Parcela excluída.');
-    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
+    if (_painelRefresh) { _painelRefresh(); _painelRefresh = null; }
   },
   _excluirGrupo(grupoId) {
     Modal.fechar();
     Storage.salvarTransacoes(Storage.transacoes().filter(t=>t.parcelaGrupoId!==grupoId));
     this._renderLista(); toast('Parcelas excluídas.');
-    if (FaturaDetalhe._onAcao) { FaturaDetalhe._onAcao(); FaturaDetalhe._onAcao = null; }
+    if (_painelRefresh) { _painelRefresh(); _painelRefresh = null; }
   }
 };
 
