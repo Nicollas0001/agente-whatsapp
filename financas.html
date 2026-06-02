@@ -925,32 +925,55 @@ const Chat = {
   },
 
   _executarAcoes(acoes) {
-    const arr = Storage.transacoes();
-    let n = 0;
+    let atualizou = false;
+    const transArr = Storage.transacoes();
+
     for (const a of acoes) {
-      if (a.tipo !== 'transacao') continue;
       const d = a.dados;
-      if (!d || !d.valor || parseFloat(d.valor) <= 0) continue;
-      arr.push({
-        id: Utils.uuid(),
-        data: d.data || Utils.dataHoje(),
-        descricao: d.descricao || 'Lançamento via assistente',
-        valor: parseFloat(d.valor),
-        tipo: d.tipo || 'despesa',
-        categoria: d.categoriaId || null,
-        contaId: d.contaId || null,
-        cartaoId: d.cartaoId || null,
-        contaDestinoId: null,
-        parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null
-      });
-      n++;
+
+      if (a.tipo === 'transacao') {
+        if (!d || !d.valor || parseFloat(d.valor) <= 0) continue;
+        transArr.push({
+          id: Utils.uuid(),
+          data: d.data || Utils.dataHoje(),
+          descricao: d.descricao || 'Lançamento via assistente',
+          valor: parseFloat(d.valor),
+          tipo: d.tipo || 'despesa',
+          categoria: d.categoriaId || null,
+          contaId: d.contaId || null,
+          cartaoId: d.cartaoId || null,
+          contaDestinoId: null,
+          parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null
+        });
+        atualizou = true;
+
+      } else if (a.tipo === 'atualizar_cartao') {
+        const cartoes = Storage.cartoes();
+        const c = cartoes.find(x => x.id === d.cartaoId);
+        if (c) {
+          if (d.limite != null) c.limite = parseFloat(d.limite);
+          Storage.salvarCartoes(cartoes);
+          atualizou = true;
+        }
+
+      } else if (a.tipo === 'atualizar_conta') {
+        const contas = Storage.contas();
+        const c = contas.find(x => x.id === d.contaId);
+        if (c && d.novoSaldo != null) {
+          c.saldoInicial = (c.saldoInicial || 0) + (parseFloat(d.novoSaldo) - Fin.saldoConta(c.id));
+          Storage.salvarContas(contas);
+          atualizou = true;
+        }
+      }
     }
-    if (n > 0) {
-      Storage.salvarTransacoes(arr);
-      if (Router.atual === 'dashboard')    Telas.dashboard.render();
-      if (Router.atual === 'lancamentos')  Telas.lancamentos._renderLista();
-      if (Router.atual === 'cartoes')      Telas.cartoes.render();
-      if (Router.atual === 'contas')       Telas.contas.render();
+
+    if (acoes.some(a => a.tipo === 'transacao')) Storage.salvarTransacoes(transArr);
+    if (atualizou) {
+      if (Router.atual === 'dashboard')   Telas.dashboard.render();
+      if (Router.atual === 'lancamentos') Telas.lancamentos._renderLista();
+      if (Router.atual === 'cartoes')     Telas.cartoes.render();
+      if (Router.atual === 'contas')      Telas.contas.render();
+      if (Router.atual === 'ajuste')      Telas.ajuste.render();
     }
   },
 
@@ -984,13 +1007,14 @@ const Chat = {
 
     const contaPadrao = contas.find(c => c.nome === 'Inter')?.id || contas[0]?.id || 'null';
 
-    return `Você é o assistente financeiro pessoal do usuário. Registre transações e responda perguntas sobre as finanças dele.
+    return `Você é o assistente financeiro pessoal integrado ao app de controle financeiro do usuário. Você TEM ACESSO DIRETO ao app e pode fazer alterações nele.
+
 DATA HOJE: ${hoje}
 
-CONTAS BANCÁRIAS:
+CONTAS BANCÁRIAS DO APP:
 ${contasStr||'(nenhuma)'}
 
-CARTÕES DE CRÉDITO:
+CARTÕES DE CRÉDITO DO APP:
 ${cartoesStr||'(nenhum)'}
 
 CATEGORIAS DISPONÍVEIS:
@@ -999,17 +1023,33 @@ ${catsStr}
 LANÇAMENTOS RECENTES (45 dias):
 ${recentes||'(nenhum)'}
 
+O QUE VOCÊ PODE FAZER DIRETAMENTE NO APP:
+1. Registrar transações (despesas, receitas, compras no cartão)
+2. Alterar limite de cartão de crédito
+3. Ajustar saldo de conta bancária
+4. Responder perguntas e análises sobre as finanças
+
 REGRAS:
 - Responda SEMPRE em português brasileiro, direto e amigável (máx 2 linhas)
 - Conta padrão para gastos sem conta especificada: Inter id:${contaPadrao}
-- Para múltiplos gastos numa mensagem, crie uma transação para cada item
-- Para análises/relatórios/perguntas, responda no campo "resposta" sem ações
-- Se não souber conta/cartão com certeza, use null e informe na resposta
+- Para múltiplos gastos numa mensagem, crie uma transação para cada
+- NUNCA diga que não pode alterar algo no app — você pode, use a ação correta
+- Se o usuário pedir para alterar limite de cartão, use ação "atualizar_cartao"
+- Se o usuário pedir para ajustar saldo de conta, use ação "atualizar_conta"
 
 RESPONDA SEMPRE EM JSON VÁLIDO sem markdown sem blocos de código:
-{"resposta":"texto amigável","acoes":[{"tipo":"transacao","dados":{"tipo":"despesa","valor":0.00,"descricao":"descrição","categoriaId":"id","contaId":"id-ou-null","cartaoId":"id-ou-null","data":"${hoje}"}}]}
 
-Para perguntas sem ação usar: {"resposta":"resposta aqui","acoes":[]}`;
+Para registrar gasto/receita:
+{"resposta":"texto","acoes":[{"tipo":"transacao","dados":{"tipo":"despesa","valor":0.00,"descricao":"descrição","categoriaId":"id","contaId":"id-ou-null","cartaoId":"id-ou-null","data":"${hoje}"}}]}
+
+Para alterar limite do cartão:
+{"resposta":"texto","acoes":[{"tipo":"atualizar_cartao","dados":{"cartaoId":"id","limite":0.00}}]}
+
+Para ajustar saldo da conta:
+{"resposta":"texto","acoes":[{"tipo":"atualizar_conta","dados":{"contaId":"id","novoSaldo":0.00}}]}
+
+Para perguntas sem ação:
+{"resposta":"resposta aqui","acoes":[]}`;
   },
 
   // ── Regex (fallback sem chave de API) ─────────────────
