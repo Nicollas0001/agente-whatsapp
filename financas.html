@@ -455,7 +455,12 @@ canvas { display: block; }
 .recomp-hist { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .recomp-mes { text-align:center; font-size:11px; }
 .recomp-ico { font-size:22px; display:block; }
+.sync-wrap { padding:6px 0 2px; text-align:center; font-size:16px; line-height:1; }
+#sync-dot { cursor:default; }
 </style>
+<!-- Firebase Sync -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div id="app">
@@ -480,6 +485,7 @@ canvas { display: block; }
     <a href="#relatorios" data-tela="relatorios"><span class="nav-ico">📊</span><span>Relatórios</span></a>
     <a href="#ajuste"    data-tela="ajuste">   <span class="nav-ico">⚡</span><span>Ajuste</span></a>
     <a href="#config"    data-tela="config">   <span class="nav-ico">⚙️</span><span>Config</span></a>
+    <div class="sync-wrap"><span id="sync-dot" title="Status da sincronização">🟡</span></div>
   </nav>
 
   <button id="fab" title="Novo lançamento">＋</button>
@@ -555,6 +561,111 @@ const Storage = {
     if (obj.metaInvest != null) this.salvarMetaInvest(obj.metaInvest);
   }
 };
+
+/* ═══════════════════════════════════════════════════════════
+   SYNC (Firebase Firestore — auto-sync entre dispositivos)
+═══════════════════════════════════════════════════════════ */
+const Sync = (function() {
+  let _db = null, _timer = null, _pulling = false;
+
+  function _doc() { return _db && _db.collection('financas').doc('dados'); }
+
+  function _setStatus(s) {
+    const el = document.getElementById('sync-dot');
+    if (!el) return;
+    const icons = { idle:'🟡', syncing:'🔵', synced:'🟢', error:'🔴', offline:'⚫' };
+    const tips  = { idle:'Sync pendente', syncing:'Sincronizando…', synced:'Sincronizado ✓', error:'Erro de sync', offline:'Sem conexão' };
+    el.textContent = icons[s] || '🟡';
+    el.title = tips[s] || '';
+  }
+
+  return {
+    init() {
+      if (typeof firebase === 'undefined') { _setStatus('offline'); return; }
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp({
+            apiKey: "AIzaSyBGEQE5UJS9pMfu83nSURIYQe4dLDWmacA",
+            authDomain: "financas-pessoal-1ca66.firebaseapp.com",
+            projectId: "financas-pessoal-1ca66",
+            storageBucket: "financas-pessoal-1ca66.firebasestorage.app",
+            messagingSenderId: "345420883651",
+            appId: "1:345420883651:web:31a0e381ab462678db6476"
+          });
+        }
+        _db = firebase.firestore();
+        _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+      } catch(e) { console.warn('Firebase init:', e); }
+      window.addEventListener('online',  () => { _setStatus('idle'); this.push(); });
+      window.addEventListener('offline', () => _setStatus('offline'));
+      if (!navigator.onLine) _setStatus('offline');
+    },
+
+    push() {
+      if (!_db || _pulling) return;
+      clearTimeout(_timer);
+      _timer = setTimeout(async () => {
+        _setStatus('syncing');
+        try {
+          await _doc().set({
+            contas: Storage.contas(),
+            cartoes: Storage.cartoes(),
+            transacoes: Storage.transacoes(),
+            categorias: Storage.categorias(),
+            fixos: Storage.fixos(),
+            fixosLog: Storage.fixosLog(),
+            investimentos: Storage.investimentos(),
+            metaInvest: Storage.metaInvest(),
+            recompensas: Storage.recompensas(),
+            versao: localStorage.getItem('ff_versao') || '',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          _setStatus('synced');
+        } catch(e) {
+          console.warn('Sync push:', e);
+          _setStatus(navigator.onLine ? 'error' : 'offline');
+        }
+      }, 1500);
+    },
+
+    async pull() {
+      if (!_db) return false;
+      _setStatus('syncing');
+      try {
+        const snap = await _doc().get();
+        if (!snap.exists || !snap.data().contas) { _setStatus('idle'); return false; }
+        const d = snap.data();
+        _pulling = true;
+        if (d.contas)            Storage.salvarContas(d.contas);
+        if (d.cartoes)           Storage.salvarCartoes(d.cartoes);
+        if (d.transacoes)        Storage.salvarTransacoes(d.transacoes);
+        if (d.categorias)        Storage.salvarCategorias(d.categorias);
+        if (d.fixos)             Storage.salvarFixos(d.fixos);
+        if (d.fixosLog)          Storage.salvarFixosLog(d.fixosLog);
+        if (d.investimentos)     Storage.salvarInvestimentos(d.investimentos);
+        if (d.metaInvest != null) Storage.salvarMetaInvest(d.metaInvest);
+        if (d.recompensas)       Storage.salvarRecompensas(d.recompensas);
+        if (d.versao)            localStorage.setItem('ff_versao', d.versao);
+        _pulling = false;
+        _setStatus('synced');
+        return true;
+      } catch(e) {
+        _pulling = false;
+        console.warn('Sync pull:', e);
+        _setStatus(navigator.onLine ? 'error' : 'offline');
+        return false;
+      }
+    }
+  };
+})();
+
+// Patch Storage: todo salvar* também envia para Firestore
+['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
+ 'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas'
+].forEach(fn => {
+  const orig = Storage[fn].bind(Storage);
+  Storage[fn] = function(...args) { orig(...args); Sync.push(); };
+});
 
 /* ═══════════════════════════════════════════════════════════
    UTILS
@@ -3080,14 +3191,16 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 /* ═══════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════ */
-seed();
-Chat.init();
-verificarRecompensa();
-verificarFixos();
-Router.init();
+(async function() {
+  Sync.init();
+  const pulled = await Sync.pull();
+  if (!pulled) seed();
+  Chat.init();
+  verificarRecompensa();
+  verificarFixos();
+  Router.init();
 
-// Avisa se parece ser primeira abertura após atualização de arquivo
-(function() {
+  // Avisa se parece ser primeira abertura após atualização de arquivo
   const j = localStorage.getItem('ff_contas');
   const temDados = j && JSON.parse(j).length > 0;
   if (!temDados && !localStorage.getItem('ff_bem_vindo')) {
