@@ -3015,10 +3015,10 @@ Telas.config = {
       </div>
 
       <div class="card" style="margin-bottom:16px">
-        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">🔁 Gastos Fixos Mensais</h2>
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:6px">🔴 Gastos Fixos Mensais</h2>
         <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Lançados automaticamente todo mês no dia configurado.</p>
         <div id="fixos-lista">
-          ${Storage.fixos().map(f=>{
+          ${Storage.fixos().filter(f=>f.tipo!=='receita').map(f=>{
             const cat = Storage.categorias().find(c=>c.id===f.categoria);
             return `<div class="lista-item">
               <div class="ico-cat" style="background:${(cat?.cor||'#444')+'22'}">${cat?.ico||'📦'}</div>
@@ -3033,7 +3033,29 @@ Telas.config = {
             </div>`;
           }).join('') || '<div style="color:var(--txt2);font-size:13px;padding:8px 0">Nenhum gasto fixo cadastrado.</div>'}
         </div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Telas.config.novoFixo()">+ Novo gasto fixo</button>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Telas.config.novoFixo('despesa')">+ Novo gasto fixo</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:6px">🟢 Receitas Fixas Mensais</h2>
+        <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Entradas recorrentes lançadas automaticamente todo mês.</p>
+        <div id="receitas-fixas-lista">
+          ${Storage.fixos().filter(f=>f.tipo==='receita').map(f=>{
+            const cat = Storage.categorias().find(c=>c.id===f.categoria);
+            return `<div class="lista-item">
+              <div class="ico-cat" style="background:${(cat?.cor||'#06D6A0')+'22'}">${cat?.ico||'💰'}</div>
+              <div class="lista-info">
+                <div class="lista-titulo">${Utils.esc(f.descricao)}</div>
+                <div class="lista-sub">${Utils.moeda(f.valor)} • Todo dia ${f.dia}${f.contaId ? ' • 🏦 '+(Storage.contas().find(c=>c.id===f.contaId)?.nome||'') : ''} • ${f.ativo?'Ativo':'Pausado'}</div>
+              </div>
+              <div class="lista-acoes">
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.config.editarFixo('${f.id}')">${f.ativo?'⏸️':'▶️'}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.config.excluirFixo('${f.id}')">🗑️</button>
+              </div>
+            </div>`;
+          }).join('') || '<div style="color:var(--txt2);font-size:13px;padding:8px 0">Nenhuma receita fixa cadastrada.</div>'}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Telas.config.novoFixo('receita')">+ Nova receita fixa</button>
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -3129,7 +3151,7 @@ Telas.config = {
       this.render(); toast('Categoria excluída.');
     });
   },
-  novoFixo() { this._formFixo(null); },
+  novoFixo(tipo) { this._formFixo(null, tipo); },
   editarFixo(id) {
     const f = Storage.fixos().find(x=>x.id===id);
     if (!f) return;
@@ -3139,15 +3161,17 @@ Telas.config = {
     Storage.salvarFixos(arr);
     this.render(); toast(arr[idx].ativo ? 'Ativado!' : 'Pausado!');
   },
-  _formFixo(id) {
+  _formFixo(id, tipoDefault) {
     const f = id ? Storage.fixos().find(x=>x.id===id) : null;
-    const cats = Storage.categorias().filter(c=>c.tipo!=='receita');
+    const tipoAtual = f?.tipo || tipoDefault || 'despesa';
+    const isReceita = tipoAtual === 'receita';
+    const cats = Storage.categorias().filter(c => isReceita ? c.tipo !== 'despesa' : c.tipo !== 'receita');
     const catOpts = cats.map(c=>`<option value="${c.id}"${f?.categoria===c.id?' selected':''}>${c.ico} ${Utils.esc(c.nome)}</option>`).join('');
     const contaOpts = [`<option value="">Nenhuma</option>`,
       ...Storage.contas().map(c=>`<option value="${c.id}"${f?.contaId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
     const cartaoOpts = [`<option value="">Nenhum</option>`,
       ...Storage.cartoes().map(c=>`<option value="${c.id}"${f?.cartaoId===c.id?' selected':''}>${Utils.esc(c.nome)}</option>`)].join('');
-    Modal.abrir('Gasto Fixo Mensal', `
+    Modal.abrir(isReceita ? 'Receita Fixa Mensal' : 'Gasto Fixo Mensal', `
       <div class="form-grupo"><label>Descrição</label>
         <input id="gf-desc" type="text" placeholder="Ex: Aluguel" value="${Utils.esc(f?.descricao||'')}">
         <div class="form-erro" id="gf-err">Informe a descrição</div></div>
@@ -3167,6 +3191,7 @@ Telas.config = {
           id: id || Utils.uuid(), descricao: desc,
           valor: parseFloat(document.getElementById('gf-val').value) || 0,
           dia: parseInt(document.getElementById('gf-dia').value) || 1,
+          tipo: tipoAtual,
           categoria: document.getElementById('gf-cat').value,
           contaId: document.getElementById('gf-conta').value || null,
           cartaoId: document.getElementById('gf-cartao').value || null,
