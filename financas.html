@@ -412,6 +412,33 @@ canvas { display: block; }
   #nav a span:not(.nav-ico) { display: none; }
   .form-row { grid-template-columns: 1fr; }
 }
+.ajuste-section { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.ajuste-section-title { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+.ajuste-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+.ajuste-item:last-of-type { border-bottom: none; }
+.ajuste-item-inativo { opacity: 0.5; }
+.ajuste-item-info { flex: 1; min-width: 120px; }
+.ajuste-item-nome { font-weight: 600; font-size: 15px; }
+.ajuste-item-detalhe { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.ajuste-item-valor { font-weight: 700; font-size: 16px; min-width: 90px; text-align: right; }
+.btn-ajuste { background: var(--card-hover); border: 1px solid var(--borda); color: var(--text); padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.btn-ajuste:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-del { background: rgba(239,71,111,0.12) !important; border-color: rgba(239,71,111,0.4) !important; color: #ef476f !important; }
+.btn-del:hover { background: #ef476f !important; color: #fff !important; }
+.btn-toggle { padding: 6px 14px; border-radius: 20px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+.toggle-ativo { background: rgba(6,214,160,0.18); color: #06D6A0; }
+.toggle-inativo { background: rgba(239,71,111,0.12); color: #ef476f; }
+.ajuste-inline-form { background: var(--fundo); border: 1px solid var(--accent); border-radius: 10px; padding: 16px; margin: 8px 0 12px; }
+.ajuste-inline-form label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; margin-top: 8px; }
+.ajuste-inline-form label:first-child { margin-top: 0; }
+.ajuste-inline-form input, .ajuste-inline-form select { width: 100%; background: var(--card-bg); border: 1px solid var(--borda); color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 15px; box-sizing: border-box; }
+.ajuste-inline-form .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ajuste-form-btns { display: flex; gap: 10px; margin-top: 14px; }
+.ajuste-form-btns button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; cursor: pointer; font-weight: 600; }
+.ajuste-form-btns button:first-child { background: var(--accent); color: #fff; }
+.ajuste-form-btns button:last-child { background: var(--card-hover); color: var(--text); border: 1px solid var(--borda); }
+.btn-novo-fixo { width: 100%; padding: 13px; background: rgba(6,214,160,0.08); border: 2px dashed rgba(6,214,160,0.4); color: var(--accent); border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 16px; }
+.btn-novo-fixo:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -425,6 +452,7 @@ canvas { display: block; }
     <section class="tela" id="tela-relatorios"></section>
     <section class="tela" id="tela-investimentos"></section>
     <section class="tela" id="tela-config"></section>
+    <section class="tela" id="tela-ajuste"></section>
   </main>
 
   <nav id="nav">
@@ -434,6 +462,7 @@ canvas { display: block; }
     <a href="#lancamentos" data-tela="lancamentos"><span class="nav-ico">📋</span><span>Lançamentos</span></a>
     <a href="#investimentos" data-tela="investimentos"><span class="nav-ico">💹</span><span>Investir</span></a>
     <a href="#relatorios" data-tela="relatorios"><span class="nav-ico">📊</span><span>Relatórios</span></a>
+    <a href="#ajuste"    data-tela="ajuste">   <span class="nav-ico">⚡</span><span>Ajuste</span></a>
     <a href="#config"    data-tela="config">   <span class="nav-ico">⚙️</span><span>Config</span></a>
   </nav>
 
@@ -1300,7 +1329,7 @@ const Graf = {
    ROUTER
 ═══════════════════════════════════════════════════════════ */
 const Router = {
-  telas: ['dashboard','contas','cartoes','lancamentos','investimentos','relatorios','config'],
+  telas: ['dashboard','contas','cartoes','lancamentos','investimentos','relatorios','ajuste','config'],
   atual: null,
   init() {
     window.addEventListener('hashchange', () => this._navegar());
@@ -2624,6 +2653,215 @@ Telas.config = {
       Storage.salvarFixos(Storage.fixos().filter(f=>f.id!==id));
       this.render(); toast('Excluído.');
     });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TELA AJUSTE RÁPIDO
+═══════════════════════════════════════════════════════════ */
+Telas.ajuste = {
+  render() {
+    const el = document.getElementById('tela-ajuste');
+    const contas = Storage.contas();
+    const cartoes = Storage.cartoes();
+    const fixos = Storage.fixos();
+
+    const contasHtml = contas.map(c => {
+      const saldo = Fin.saldoConta(c.id);
+      return `
+        <div class="ajuste-item" id="ajuste-conta-${c.id}">
+          <div class="ajuste-item-info">
+            <div class="ajuste-item-nome" style="color:${c.cor}">${c.nome}</div>
+            <div class="ajuste-item-detalhe">${c.banco} · ${c.tipo}</div>
+          </div>
+          <div class="ajuste-item-valor">${Utils.moeda(saldo)}</div>
+          <button class="btn-ajuste" onclick="Telas.ajuste._abrirForm('conta','${c.id}')">✏️ Corrigir</button>
+        </div>
+        <div class="ajuste-inline-form" id="form-conta-${c.id}" style="display:none">
+          <label>Saldo atual real (R$)</label>
+          <input type="number" step="0.01" id="input-conta-${c.id}" value="${saldo.toFixed(2)}">
+          <div class="ajuste-form-btns">
+            <button onclick="Telas.ajuste.salvarConta('${c.id}')">✅ Salvar</button>
+            <button onclick="Telas.ajuste._fecharForm('conta','${c.id}')">✕ Cancelar</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const cartoesHtml = cartoes.map(c => `
+        <div class="ajuste-item" id="ajuste-cartao-${c.id}">
+          <div class="ajuste-item-info">
+            <div class="ajuste-item-nome" style="color:${c.cor}">${c.nome}</div>
+            <div class="ajuste-item-detalhe">${c.banco} · Fecha dia ${c.diaFechamento} · Vence dia ${c.diaVencimento}</div>
+          </div>
+          <div class="ajuste-item-valor">${Utils.moeda(c.limite)}</div>
+          <button class="btn-ajuste" onclick="Telas.ajuste._abrirForm('cartao','${c.id}')">✏️ Limite</button>
+        </div>
+        <div class="ajuste-inline-form" id="form-cartao-${c.id}" style="display:none">
+          <label>Novo limite (R$)</label>
+          <input type="number" step="0.01" id="input-cartao-${c.id}" value="${c.limite.toFixed(2)}">
+          <div class="ajuste-form-btns">
+            <button onclick="Telas.ajuste.salvarCartao('${c.id}')">✅ Salvar</button>
+            <button onclick="Telas.ajuste._fecharForm('cartao','${c.id}')">✕ Cancelar</button>
+          </div>
+        </div>`).join('');
+
+    const contaNome = id => (contas.find(c=>c.id===id)||{nome:'—'}).nome;
+    const cartaoNome = id => (cartoes.find(c=>c.id===id)||{nome:'—'}).nome;
+    const fixosHtml = fixos.map(f => {
+      const onde = f.cartaoId ? '💳 '+cartaoNome(f.cartaoId) : '🏦 '+contaNome(f.contaId);
+      const tipoIco = f.tipo === 'receita' ? '🟢' : '🔴';
+      return `
+        <div class="ajuste-item ${f.ativo?'':'ajuste-item-inativo'}" id="ajuste-fixo-${f.id}">
+          <div class="ajuste-item-info">
+            <div class="ajuste-item-nome">${tipoIco} ${f.descricao}</div>
+            <div class="ajuste-item-detalhe">${onde} · todo dia ${f.dia}</div>
+          </div>
+          <div class="ajuste-item-valor">${Utils.moeda(f.valor)}</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn-toggle ${f.ativo?'toggle-ativo':'toggle-inativo'}" onclick="Telas.ajuste.toggleFixo('${f.id}')">${f.ativo?'✅ Ativo':'⏸ Pausado'}</button>
+            <button class="btn-ajuste" onclick="Telas.ajuste._abrirForm('fixo','${f.id}')">✏️ Editar</button>
+            <button class="btn-ajuste btn-del" onclick="Telas.ajuste.excluirFixo('${f.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="ajuste-inline-form" id="form-fixo-${f.id}" style="display:none">
+          <div class="form-row-2">
+            <div><label>Descrição</label><input id="if-desc-${f.id}" value="${f.descricao}"></div>
+            <div><label>Valor (R$)</label><input type="number" step="0.01" id="if-val-${f.id}" value="${f.valor.toFixed(2)}"></div>
+            <div><label>Dia do mês</label><input type="number" min="1" max="31" id="if-dia-${f.id}" value="${f.dia}"></div>
+            <div><label>Tipo</label>
+              <select id="if-tipo-${f.id}">
+                <option value="despesa" ${f.tipo==='despesa'?'selected':''}>🔴 Despesa</option>
+                <option value="receita" ${f.tipo==='receita'?'selected':''}>🟢 Receita</option>
+              </select>
+            </div>
+          </div>
+          <div class="ajuste-form-btns">
+            <button onclick="Telas.ajuste.salvarFixo('${f.id}')">✅ Salvar</button>
+            <button onclick="Telas.ajuste._fecharForm('fixo','${f.id}')">✕ Cancelar</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="tela-header"><h2>⚡ Ajuste Rápido</h2>
+        <p style="color:var(--text-muted);font-size:14px;margin:4px 0 0">Atualize saldos, limites e recorrentes sem abrir outra tela.</p>
+      </div>
+      <div class="ajuste-section">
+        <div class="ajuste-section-title">🏦 Contas — Corrigir Saldo Atual</div>
+        ${contasHtml}
+      </div>
+      <div class="ajuste-section">
+        <div class="ajuste-section-title">💳 Cartões — Atualizar Limite</div>
+        ${cartoesHtml}
+      </div>
+      <div class="ajuste-section">
+        <div class="ajuste-section-title">🔁 Recorrentes (Fixos)</div>
+        <button class="btn-novo-fixo" onclick="Telas.ajuste.novoFixo()">＋ Adicionar Novo Recorrente</button>
+        ${fixosHtml}
+      </div>`;
+  },
+
+  _abrirForm(tipo, id) {
+    document.querySelectorAll('.ajuste-inline-form').forEach(f => f.style.display = 'none');
+    const form = document.getElementById(`form-${tipo}-${id}`);
+    if (form) { form.style.display = 'block'; form.querySelector('input')?.focus(); }
+  },
+  _fecharForm(tipo, id) {
+    const form = document.getElementById(`form-${tipo}-${id}`);
+    if (form) form.style.display = 'none';
+  },
+
+  salvarConta(id) {
+    const novoSaldo = parseFloat(document.getElementById(`input-conta-${id}`).value);
+    if (isNaN(novoSaldo)) { toast('Valor inválido.'); return; }
+    const contas = Storage.contas();
+    const conta = contas.find(c => c.id === id);
+    if (!conta) return;
+    conta.saldoInicial = (conta.saldoInicial||0) + (novoSaldo - Fin.saldoConta(id));
+    Storage.salvarContas(contas);
+    toast(`Saldo de ${conta.nome} corrigido para ${Utils.moeda(novoSaldo)}.`);
+    this.render();
+  },
+
+  salvarCartao(id) {
+    const novoLimite = parseFloat(document.getElementById(`input-cartao-${id}`).value);
+    if (isNaN(novoLimite) || novoLimite <= 0) { toast('Valor inválido.'); return; }
+    const cartoes = Storage.cartoes();
+    const cartao = cartoes.find(c => c.id === id);
+    if (!cartao) return;
+    cartao.limite = novoLimite;
+    Storage.salvarCartoes(cartoes);
+    toast(`Limite de ${cartao.nome} atualizado para ${Utils.moeda(novoLimite)}.`);
+    this.render();
+  },
+
+  toggleFixo(id) {
+    const fixos = Storage.fixos();
+    const f = fixos.find(x => x.id === id);
+    if (!f) return;
+    f.ativo = !f.ativo;
+    Storage.salvarFixos(fixos);
+    toast(f.ativo ? `"${f.descricao}" reativado.` : `"${f.descricao}" pausado.`);
+    this.render();
+  },
+
+  salvarFixo(id) {
+    const desc = document.getElementById(`if-desc-${id}`).value.trim();
+    const val  = parseFloat(document.getElementById(`if-val-${id}`).value);
+    const dia  = parseInt(document.getElementById(`if-dia-${id}`).value);
+    const tipo = document.getElementById(`if-tipo-${id}`).value;
+    if (!desc || isNaN(val) || isNaN(dia) || dia < 1 || dia > 31) { toast('Preencha todos os campos corretamente.'); return; }
+    const fixos = Storage.fixos();
+    const f = fixos.find(x => x.id === id);
+    if (!f) return;
+    Object.assign(f, { descricao: desc, valor: val, dia, tipo });
+    Storage.salvarFixos(fixos);
+    toast(`"${desc}" atualizado.`);
+    this.render();
+  },
+
+  excluirFixo(id) {
+    Modal.confirmar('Excluir este recorrente permanentemente?', () => {
+      Storage.salvarFixos(Storage.fixos().filter(f => f.id !== id));
+      toast('Recorrente excluído.'); this.render();
+    });
+  },
+
+  novoFixo() {
+    const contasOpts = Storage.contas().map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+    const cartoesOpts = Storage.cartoes().map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+    Modal.abrir('Novo Recorrente', `
+      <div class="form-grupo"><label>Descrição</label><input id="nf-desc" placeholder="Ex: Netflix, Salário..."></div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Valor (R$)</label><input type="number" step="0.01" id="nf-val" placeholder="0,00"></div>
+        <div class="form-grupo"><label>Dia do mês</label><input type="number" min="1" max="31" id="nf-dia" placeholder="10"></div>
+      </div>
+      <div class="form-grupo"><label>Tipo</label>
+        <select id="nf-tipo"><option value="despesa">🔴 Despesa</option><option value="receita">🟢 Receita</option></select>
+      </div>
+      <div class="form-grupo"><label>Conta (se debitado/creditado em conta)</label>
+        <select id="nf-conta"><option value="">— nenhuma —</option>${contasOpts}</select>
+      </div>
+      <div class="form-grupo"><label>Cartão (se cobrado em cartão)</label>
+        <select id="nf-cartao"><option value="">— nenhum —</option>${cartoesOpts}</select>
+      </div>
+      <button class="btn-primary" style="width:100%;margin-top:8px" onclick="Telas.ajuste._salvarNovoFixo()">✅ Adicionar</button>`);
+  },
+
+  _salvarNovoFixo() {
+    const desc    = document.getElementById('nf-desc').value.trim();
+    const val     = parseFloat(document.getElementById('nf-val').value);
+    const dia     = parseInt(document.getElementById('nf-dia').value);
+    const tipo    = document.getElementById('nf-tipo').value;
+    const contaId = document.getElementById('nf-conta').value || null;
+    const cartaoId= document.getElementById('nf-cartao').value || null;
+    if (!desc || isNaN(val) || isNaN(dia) || dia < 1 || dia > 31) { toast('Preencha todos os campos.'); return; }
+    const fixos = Storage.fixos();
+    fixos.push({ id: Utils.uuid(), descricao: desc, valor: val, dia, tipo, contaId, cartaoId, categoria: null, ativo: true });
+    Storage.salvarFixos(fixos);
+    Modal.fechar();
+    toast(`"${desc}" adicionado aos recorrentes.`);
+    this.render();
   }
 };
 
