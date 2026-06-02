@@ -2156,6 +2156,7 @@ Telas.dashboard = {
       recTxHtml += `</div>`;
     }
 
+    const orcHtml = this._htmlOrcamento(mes, ano);
     const totalCatDep = cats.reduce((a,c) => a+c.total, 0);
     const resCls = fluxo.resultado >= 0 ? 'pos' : 'neg';
 
@@ -2178,6 +2179,7 @@ Telas.dashboard = {
         </div>
       </div>
       ${cartoesHtml}
+      ${orcHtml}
       ${cats.length ? `
         <h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Gastos por Categoria</h2>
         <div class="card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
@@ -2193,6 +2195,43 @@ Telas.dashboard = {
       ${recTxHtml}`;
     if (cats.length) Graf.donut('cv-donut', cats, totalCatDep);
     Chat.renderHistorico();
+  },
+
+  _htmlOrcamento(mes, ano) {
+    const orc = Fin.orcamento5030(mes, ano);
+    if (orc.receita === 0) return '';
+    const recs = Storage.recompensas();
+    const streak = (() => { let s=0; const sorted=[...recs].sort((a,b)=>b.mesAno.localeCompare(a.mesAno)); for(const r of sorted){if(r.ok)s++;else break;} return s; })();
+
+    const bucket = (nome, ico, pct, gasto, alvo, ok, isInvest) => {
+      const overrun = isInvest ? pct < 100 : pct > 100;
+      const cls = overrun ? 'alto' : (isInvest ? (pct>=80?'ok':'med') : (pct<80?'ok':'med'));
+      const barW = isInvest ? Math.min(100,pct) : Math.min(100,pct);
+      return `<div class="orc-bucket">
+        <div class="orc-header">
+          <span class="orc-nome">${ico} ${nome}</span>
+          <span class="orc-nums">${Utils.moeda(gasto)} / ${Utils.moeda(alvo)} (${pct}%)</span>
+        </div>
+        <div class="orc-barra-wrap"><div class="orc-barra ${cls}" style="width:${barW}%"></div></div>
+        <div class="orc-rodape">
+          <span>${isInvest ? 'mínimo' : 'limite'}: ${Utils.moeda(alvo)}</span>
+          <span style="color:${overrun?'var(--despesa)':ok?'var(--receita)':'#f5a623'}">${overrun?(isInvest?'⚠️ Abaixo da meta':'⚠️ Acima do limite'):ok?'✅ Ok':'⚡ Atenção'}</span>
+        </div>
+      </div>`;
+    };
+
+    const todosOk = orc.essencial.ok && orc.investimento.ok && orc.lazer.ok;
+    const perfeitoHtml = todosOk ? `<div class="mes-perfeito"><span style="font-size:28px">🏆</span><div><strong>Mês no caminho certo!</strong><div style="font-size:12px;color:var(--txt2)">Você está dentro das metas 50-30-20 este mês.</div></div></div>` : '';
+    const streakHtml = streak > 0 ? `<div><span class="streak-badge">🔥 ${streak} ${streak===1?'mês':'meses'} seguidos no controle</span></div>` : '';
+
+    return `<h2 style="font-size:15px;font-weight:700;margin:20px 0 10px">Regra 50·30·20</h2>
+      <div class="card orc-section">
+        ${streakHtml}${perfeitoHtml}
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:14px">Baseado em ${Utils.moeda(orc.receita)} de receita este mês</div>
+        ${bucket('Essencial (50%)','🔴',orc.essencial.pct,orc.essencial.gasto,orc.essencial.alvo,orc.essencial.ok,false)}
+        ${bucket('Investimento (30%)','💎',orc.investimento.pct,orc.investimento.gasto,orc.investimento.alvo,orc.investimento.ok,true)}
+        ${bucket('Lazer (20%)','🎮',orc.lazer.pct,orc.lazer.gasto,orc.lazer.alvo,orc.lazer.ok,false)}
+      </div>`;
   },
 
   _htmlBalanco() {
@@ -2303,9 +2342,30 @@ Telas.relatorios = {
         <button class="tab-btn${this._aba==='categoria'?' ativo':''}" onclick="Telas.relatorios._aba='categoria';Telas.relatorios._renderAba()">Categorias</button>
         <button class="tab-btn${this._aba==='faturas'?' ativo':''}" onclick="Telas.relatorios._aba='faturas';Telas.relatorios._renderAba()">Faturas</button>
         <button class="tab-btn${this._aba==='evolucao'?' ativo':''}" onclick="Telas.relatorios._aba='evolucao';Telas.relatorios._renderAba()">Evolução</button>
+        <button class="tab-btn${this._aba==='conquistas'?' ativo':''}" onclick="Telas.relatorios._aba='conquistas';Telas.relatorios._renderAba()">Conquistas</button>
       </div>
       <div id="rel-aba-conteudo"></div>`;
     this._renderAba();
+  },
+  _htmlConquistas() {
+    const recs = [...Storage.recompensas()].sort((a,b) => b.mesAno.localeCompare(a.mesAno));
+    if (!recs.length) return `<div class="vazio"><div class="vazio-ico">🏆</div><p>Nenhum mês registrado ainda.<br>Continue usando o app e o histórico aparece aqui.</p></div>`;
+    let streak = 0;
+    for (const r of recs) { if (r.ok) streak++; else break; }
+    const mesNome = ma => { const [m,a] = ma.split('-'); return Utils.nomeMes(parseInt(m),parseInt(a)); };
+    const gridHtml = recs.map(r => `<div class="recomp-mes">
+      <span class="recomp-ico">${r.ok ? '🏆' : '💔'}</span>
+      <div>${mesNome(r.mesAno)}</div>
+    </div>`).join('');
+    const total = recs.length, perfeitos = recs.filter(r=>r.ok).length;
+    return `<div class="card" style="text-align:center;margin-bottom:16px">
+        <div style="font-size:40px;margin-bottom:8px">${streak>0?'🔥':'📊'}</div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:4px">${streak} ${streak===1?'mês':'meses'} seguidos</div>
+        <div style="font-size:13px;color:var(--txt2)">${perfeitos} de ${total} meses dentro das metas</div>
+      </div>
+      <div class="card"><div style="font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:14px">HISTÓRICO DE MESES</div>
+        <div class="recomp-hist">${gridHtml}</div>
+      </div>`;
   },
   _mudarMes(d) {
     this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d);
@@ -2323,6 +2383,7 @@ Telas.relatorios = {
     if (this._aba === 'categoria') { el.innerHTML = this._htmlCategorias(mes,ano); }
     if (this._aba === 'faturas')   { el.innerHTML = this._htmlFaturas(mes,ano); }
     if (this._aba === 'evolucao')  { el.innerHTML = this._htmlEvolucao(); setTimeout(()=>this._drawEvolucao(),50); }
+    if (this._aba === 'conquistas') { el.innerHTML = this._htmlConquistas(); }
   },
   _htmlResumo(mes,ano) {
     const r = Fin.resumoMensal(mes,ano);
@@ -2811,6 +2872,48 @@ Telas.ajuste = {
         <p style="color:var(--text-muted);font-size:14px;margin:4px 0 0">Atualize saldos, limites e recorrentes sem abrir outra tela.</p>
       </div>
       <div class="ajuste-section">
+        <div class="ajuste-section-title">🎯 Meta de Investimento Mensal</div>
+        <div class="ajuste-item">
+          <div class="ajuste-item-info">
+            <div class="ajuste-item-nome">Meta mensal</div>
+            <div class="ajuste-item-detalhe">Quanto pretende investir todo mês</div>
+          </div>
+          <div class="ajuste-item-valor">${Utils.moeda(Storage.metaInvest())}</div>
+          <button class="btn-ajuste" onclick="Telas.ajuste._abrirForm('meta','unica')">✏️ Alterar</button>
+        </div>
+        <div class="ajuste-inline-form" id="form-meta-unica" style="display:none">
+          <label>Nova meta mensal (R$)</label>
+          <input type="number" step="0.01" id="input-meta" value="${Storage.metaInvest().toFixed(2)}">
+          <div class="ajuste-form-btns">
+            <button onclick="Telas.ajuste.salvarMeta()">✅ Salvar</button>
+            <button onclick="Telas.ajuste._fecharForm('meta','unica')">✕ Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <div class="ajuste-section">
+        <div class="ajuste-section-title">💳 Faturas — Adicionar Gasto</div>
+        ${Storage.cartoes().map(c => {
+          const { aberto } = Fin._periodosFatura(c);
+          const fatAb = Fin.faturaCartao(c.id, aberto.mes, aberto.ano);
+          return `<div class="ajuste-item">
+            <div class="ajuste-item-info">
+              <div class="ajuste-item-nome" style="color:${c.cor}">${c.nome}</div>
+              <div class="ajuste-item-detalhe">Em aberto: ${Utils.moeda(fatAb)} · fecha dia ${c.diaFechamento}/${String(aberto.mes).padStart(2,'0')}</div>
+            </div>
+            <button class="btn-ajuste" onclick="Telas.ajuste.adicionarFatura('${c.id}')">＋ Gasto</button>
+          </div>
+          <div class="ajuste-inline-form" id="form-fat-${c.id}" style="display:none">
+            <label>Descrição</label><input id="fat-desc-${c.id}" placeholder="Ex: Mercado, Posto...">
+            <label>Valor (R$)</label><input type="number" step="0.01" id="fat-val-${c.id}" placeholder="0,00">
+            <label>Data</label><input type="date" id="fat-data-${c.id}" value="${Utils.dataHoje()}">
+            <div class="ajuste-form-btns">
+              <button onclick="Telas.ajuste._salvarGastoFatura('${c.id}')">✅ Adicionar</button>
+              <button onclick="Telas.ajuste._fecharForm('fat','${c.id}')">✕ Cancelar</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="ajuste-section">
         <div class="ajuste-section-title">🏦 Contas — Corrigir Saldo Atual</div>
         ${contasHtml}
       </div>
@@ -2889,6 +2992,35 @@ Telas.ajuste = {
       Storage.salvarFixos(Storage.fixos().filter(f => f.id !== id));
       toast('Recorrente excluído.'); this.render();
     });
+  },
+
+  salvarMeta() {
+    const v = parseFloat(document.getElementById('input-meta').value);
+    if (isNaN(v) || v < 0) { toast('Valor inválido.'); return; }
+    Storage.salvarMetaInvest(v);
+    toast(`Meta atualizada para ${Utils.moeda(v)}/mês.`);
+    this.render();
+  },
+
+  adicionarFatura(cartaoId) {
+    document.querySelectorAll('.ajuste-inline-form').forEach(f => f.style.display='none');
+    const form = document.getElementById(`form-fat-${cartaoId}`);
+    if (form) { form.style.display='block'; form.querySelector('input')?.focus(); }
+  },
+
+  _salvarGastoFatura(cartaoId) {
+    const desc  = document.getElementById(`fat-desc-${cartaoId}`).value.trim();
+    const valor = parseFloat(document.getElementById(`fat-val-${cartaoId}`).value);
+    const data  = document.getElementById(`fat-data-${cartaoId}`).value || Utils.dataHoje();
+    if (!desc || isNaN(valor) || valor <= 0) { toast('Preencha descrição e valor.'); return; }
+    const cartao = Storage.cartoes().find(c=>c.id===cartaoId);
+    const txs = Storage.transacoes();
+    txs.push({ id: Utils.uuid(), data, descricao: desc, valor, tipo: 'despesa',
+      categoria: Storage.categorias().find(c=>c.nome==='Outros')?.id || null,
+      contaId: null, cartaoId, contaDestinoId: null, parcelas:1, parcelaAtual:1, parcelaGrupoId:null });
+    Storage.salvarTransacoes(txs);
+    toast(`Gasto de ${Utils.moeda(valor)} adicionado à fatura ${cartao?.nome||''}.`);
+    this.render();
   },
 
   novoFixo() {
