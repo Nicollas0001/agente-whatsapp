@@ -896,7 +896,7 @@ const Chat = {
           'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1024,
           system: this._buildContexto(),
           messages: merged
@@ -912,11 +912,23 @@ const Chat = {
       const content = data.content[0]?.text || '';
 
       let parsed = { resposta: content, acoes: [] };
-      try { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch {}
+      try {
+        const clean = content.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+        const m = clean.match(/\{[\s\S]*\}/);
+        if (m) {
+          const candidate = JSON.parse(m[0]);
+          if (candidate.resposta !== undefined || candidate.acoes !== undefined) parsed = candidate;
+        }
+      } catch(e) { console.warn('JSON parse:', e, content); }
 
-      if (parsed.acoes?.length) this._executarAcoes(parsed.acoes);
+      const executadas = parsed.acoes?.length ? this._executarAcoes(parsed.acoes) : 0;
       if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
-      this._addMsg('app', parsed.resposta || content, 'ok');
+
+      let msg = parsed.resposta || content;
+      if (executadas > 0) msg += `\n✅ ${executadas} ação(ões) aplicada(s) no app.`;
+      else if (parsed.acoes?.length === 0 && /adicion|altere|remov|registr/i.test(msg))
+        msg += '\n⚠️ Nenhuma ação foi executada. Tente reformular o pedido.';
+      this._addMsg('app', msg, 'ok');
 
     } catch(e) {
       if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
@@ -926,6 +938,7 @@ const Chat = {
 
   _executarAcoes(acoes) {
     let atualizou = false;
+    let executadas = 0;
     const transArr = Storage.transacoes();
 
     for (const a of acoes) {
@@ -945,7 +958,7 @@ const Chat = {
           contaDestinoId: null,
           parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null
         });
-        atualizou = true;
+        atualizou = true; executadas++;
 
       } else if (a.tipo === 'atualizar_cartao') {
         const cartoes = Storage.cartoes();
@@ -953,7 +966,7 @@ const Chat = {
         if (c) {
           if (d.limite != null) c.limite = parseFloat(d.limite);
           Storage.salvarCartoes(cartoes);
-          atualizou = true;
+          atualizou = true; executadas++;
         }
 
       } else if (a.tipo === 'remover_transacao') {
@@ -970,7 +983,7 @@ const Chat = {
             .shift()?.i;
           if (idx != null) { transacoes.splice(idx, 1); removidas++; }
         }
-        if (removidas) { Storage.salvarTransacoes(transacoes); atualizou = true; }
+        if (removidas) { Storage.salvarTransacoes(transacoes); atualizou = true; executadas++; }
 
       } else if (a.tipo === 'atualizar_conta') {
         const contas = Storage.contas();
@@ -978,19 +991,18 @@ const Chat = {
         if (c && d.novoSaldo != null) {
           c.saldoInicial = (c.saldoInicial || 0) + (parseFloat(d.novoSaldo) - Fin.saldoConta(c.id));
           Storage.salvarContas(contas);
-          atualizou = true;
+          atualizou = true; executadas++;
         }
       }
     }
 
     if (acoes.some(a => a.tipo === 'transacao')) Storage.salvarTransacoes(transArr);
     if (atualizou) {
-      if (Router.atual === 'dashboard')   Telas.dashboard.render();
-      if (Router.atual === 'lancamentos') Telas.lancamentos._renderLista();
-      if (Router.atual === 'cartoes')     Telas.cartoes.render();
-      if (Router.atual === 'contas')      Telas.contas.render();
-      if (Router.atual === 'ajuste')      Telas.ajuste.render();
+      ['dashboard','lancamentos','cartoes','contas','ajuste'].forEach(t => {
+        if (Router.atual === t) Telas[t === 'lancamentos' ? 'lancamentos' : t][t === 'lancamentos' ? '_renderLista' : 'render']();
+      });
     }
+    return executadas;
   },
 
   _buildContexto() {
@@ -1053,6 +1065,12 @@ REGRAS:
 - NUNCA diga que não pode alterar algo no app — você pode, use a ação correta
 - Se o usuário pedir para alterar limite de cartão, use ação "atualizar_cartao"
 - Se o usuário pedir para ajustar saldo de conta, use ação "atualizar_conta"
+
+⚠️ REGRA CRÍTICA — NUNCA IGNORE:
+O array "acoes" é o que REALMENTE executa as mudanças no app.
+Se "acoes" estiver vazio, NADA acontece no app, independente do que você escrever em "resposta".
+SEMPRE que o usuário pedir para adicionar, remover ou alterar algo, coloque a ação correspondente em "acoes".
+NUNCA diga que fez algo se não colocou a ação em "acoes".
 
 RESPONDA SEMPRE EM JSON VÁLIDO sem markdown sem blocos de código:
 
