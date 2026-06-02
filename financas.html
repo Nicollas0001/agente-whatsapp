@@ -439,6 +439,22 @@ canvas { display: block; }
 .ajuste-form-btns button:last-child { background: var(--card-hover); color: var(--text); border: 1px solid var(--borda); }
 .btn-novo-fixo { width: 100%; padding: 13px; background: rgba(6,214,160,0.08); border: 2px dashed rgba(6,214,160,0.4); color: var(--accent); border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 16px; }
 .btn-novo-fixo:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.orc-section { margin:20px 0 16px; }
+.orc-bucket { margin-bottom:14px; }
+.orc-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:13px; }
+.orc-header .orc-nome { font-weight:600; }
+.orc-header .orc-nums { font-size:12px; color:var(--txt2); }
+.orc-barra-wrap { background:rgba(255,255,255,.08); border-radius:6px; height:10px; overflow:hidden; }
+.orc-barra { height:100%; border-radius:6px; transition:width .5s; }
+.orc-barra.ok  { background:var(--receita); }
+.orc-barra.med { background:#f5a623; }
+.orc-barra.alto{ background:var(--despesa); }
+.orc-rodape { display:flex; justify-content:space-between; margin-top:4px; font-size:11px; color:var(--txt2); }
+.streak-badge { display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg,#f5a623,#e74c3c); color:#fff; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:700; margin-bottom:12px; }
+.mes-perfeito { background:linear-gradient(135deg,rgba(6,214,160,.12),rgba(255,209,102,.08)); border:1px solid rgba(6,214,160,.35); border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.recomp-hist { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.recomp-mes { text-align:center; font-size:11px; }
+.recomp-ico { font-size:22px; display:block; }
 </style>
 </head>
 <body>
@@ -520,6 +536,8 @@ const Storage = {
   salvarFixosLog(v)    { this.set('fixoslog', v); },
   metaInvest()         { return this.get('metainvest') ?? 500; },
   salvarMetaInvest(v)  { this.set('metainvest', v); },
+  recompensas()        { return this.get('recompensas') || []; },
+  salvarRecompensas(v) { this.set('recompensas', v); },
   chatHistorico()      { return this.get('chathist') || []; },
   salvarChatHistorico(v){ this.set('chathist', v); },
   exportar() {
@@ -629,6 +647,20 @@ function seed() {
 /* ═══════════════════════════════════════════════════════════
    AUTO-FIXOS  (insere gastos fixos no dia certo)
 ═══════════════════════════════════════════════════════════ */
+function verificarRecompensa() {
+  const hoje = new Date();
+  if (hoje.getDate() < 2) return; // too early in month
+  const ant = Utils.addMes(hoje.getMonth()+1, hoje.getFullYear(), -1);
+  const mesAno = `${ant.mes}-${ant.ano}`;
+  const recs = Storage.recompensas();
+  if (recs.some(r => r.mesAno === mesAno)) return; // already recorded
+  const orc = Fin.orcamento5030(ant.mes, ant.ano);
+  if (orc.receita === 0) return; // no data
+  const ok = orc.essencial.ok && orc.investimento.ok && orc.lazer.ok;
+  recs.push({ mesAno, ok, gasto: { essencial: orc.essencial.gasto, investimento: orc.investimento.gasto, lazer: orc.lazer.gasto }, receita: orc.receita });
+  Storage.salvarRecompensas(recs);
+}
+
 function verificarFixos() {
   const hoje = new Date();
   const diaHoje = hoje.getDate();
@@ -844,6 +876,18 @@ const Chat = {
 /* ═══════════════════════════════════════════════════════════
    FINANCEIRO  (cálculos, nunca grava estado)
 ═══════════════════════════════════════════════════════════ */
+const BUCKET_NOMES = {
+  'Alimentação / Mercado':'essencial','Transporte / Combustível':'essencial',
+  'Cantina':'essencial','Conta de Água':'essencial','Aluguel':'essencial',
+  'Telefone':'essencial','Saúde / Farmácia':'essencial','Empréstimo':'essencial',
+  'Jiu Jitsu':'investimento','Educação':'investimento',
+  'Lazer / Assinaturas':'lazer','Energético':'lazer','Outros':'lazer',
+};
+function bucketDaCategoria(catId) {
+  const cat = Storage.categorias().find(c => c.id === catId);
+  return cat ? (BUCKET_NOMES[cat.nome] || 'lazer') : 'lazer';
+}
+
 const Fin = {
   saldoConta(contaId) {
     const conta = Storage.contas().find(c => c.id === contaId);
@@ -935,6 +979,26 @@ const Fin = {
       if (t.tipo === 'despesa') despesas += t.valor;
     }
     return { receitas, despesas, saldo: receitas - despesas };
+  },
+  orcamento5030(mes, ano) {
+    const txs = Storage.transacoes().filter(t => Utils.datasNoMes(t.data, mes, ano));
+    const receita = txs.filter(t => t.tipo === 'receita' && t.contaId).reduce((a,t)=>a+t.valor,0);
+    const investMes = Storage.investimentos().filter(i=>Utils.datasNoMes(i.data,mes,ano)).reduce((a,i)=>a+i.valor,0);
+    let essencial = 0, investimento = investMes, lazer = 0;
+    for (const t of txs) {
+      if (t.tipo !== 'despesa') continue;
+      const b = bucketDaCategoria(t.categoria);
+      if (b === 'essencial')    essencial    += t.valor;
+      else if (b === 'investimento') investimento += t.valor;
+      else lazer += t.valor;
+    }
+    const alvoE = receita * 0.50, alvoI = receita * 0.30, alvoL = receita * 0.20;
+    return {
+      receita,
+      essencial:    { gasto: essencial,    alvo: alvoE, pct: alvoE ? Math.round(essencial/alvoE*100)    : 0, ok: essencial    <= alvoE },
+      investimento: { gasto: investimento, alvo: alvoI, pct: alvoI ? Math.round(investimento/alvoI*100) : 0, ok: investimento >= alvoI },
+      lazer:        { gasto: lazer,        alvo: alvoL, pct: alvoL ? Math.round(lazer/alvoL*100)        : 0, ok: lazer        <= alvoL },
+    };
   },
   // Fluxo de caixa real: entradas = receitas; saídas = despesas pagas do banco + pagamentos de fatura
   fluxoCaixa(mes, ano) {
@@ -2886,6 +2950,7 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 ═══════════════════════════════════════════════════════════ */
 seed();
 Chat.init();
+verificarRecompensa();
 verificarFixos();
 Router.init();
 
