@@ -850,21 +850,175 @@ const NLP_MAPA = [
 
 const Chat = {
   _hist: [],
-  init() { this._hist = Storage.chatHistorico().slice(-30); },
+  init() { this._hist = Storage.chatHistorico().slice(-40); },
 
-  processar(txt) {
+  async processar(txt) {
     txt = txt.trim();
     if (!txt) return;
     this._addMsg('user', txt);
+    const key = localStorage.getItem('anthropic_key');
+    if (key) await this._processarIA(txt, key);
+    else this._processarRegex(txt);
+  },
+
+  // ── IA: Claude API ────────────────────────────────────
+  async _processarIA(txt, apiKey) {
+    const chatEl = document.getElementById('chat-hist');
+    const loadDiv = document.createElement('div');
+    loadDiv.className = 'chat-msg app';
+    loadDiv.style.opacity = '0.6';
+    loadDiv.textContent = '⏳ Pensando…';
+    if (chatEl) { chatEl.appendChild(loadDiv); chatEl.scrollTop = chatEl.scrollHeight; }
+
+    try {
+      // Monta histórico excluindo mensagem atual (já está no _hist)
+      const msgs = this._hist
+        .filter(h => h.cls !== 'loading')
+        .slice(-14)
+        .map(h => ({ role: h.de === 'user' ? 'user' : 'assistant', content: h.msg }));
+
+      // Garante alternância e começo com user
+      const merged = [];
+      for (const m of msgs) {
+        if (merged.length && merged[merged.length-1].role === m.role)
+          merged[merged.length-1].content += '\n' + m.content;
+        else merged.push({...m});
+      }
+      while (merged.length && merged[0].role !== 'user') merged.shift();
+      if (!merged.length) merged.push({ role: 'user', content: txt });
+
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: this._buildContexto(),
+          messages: merged
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Erro HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      const content = data.content[0]?.text || '';
+
+      let parsed = { resposta: content, acoes: [] };
+      try { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch {}
+
+      if (parsed.acoes?.length) this._executarAcoes(parsed.acoes);
+      if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
+      this._addMsg('app', parsed.resposta || content, 'ok');
+
+    } catch(e) {
+      if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
+      this._addMsg('app', `❌ ${e.message}`, 'err');
+    }
+  },
+
+  _executarAcoes(acoes) {
+    const arr = Storage.transacoes();
+    let n = 0;
+    for (const a of acoes) {
+      if (a.tipo !== 'transacao') continue;
+      const d = a.dados;
+      if (!d || !d.valor || parseFloat(d.valor) <= 0) continue;
+      arr.push({
+        id: Utils.uuid(),
+        data: d.data || Utils.dataHoje(),
+        descricao: d.descricao || 'Lançamento via assistente',
+        valor: parseFloat(d.valor),
+        tipo: d.tipo || 'despesa',
+        categoria: d.categoriaId || null,
+        contaId: d.contaId || null,
+        cartaoId: d.cartaoId || null,
+        contaDestinoId: null,
+        parcelas: 1, parcelaAtual: 1, parcelaGrupoId: null
+      });
+      n++;
+    }
+    if (n > 0) {
+      Storage.salvarTransacoes(arr);
+      if (Router.atual === 'dashboard')    Telas.dashboard.render();
+      if (Router.atual === 'lancamentos')  Telas.lancamentos._renderLista();
+      if (Router.atual === 'cartoes')      Telas.cartoes.render();
+      if (Router.atual === 'contas')       Telas.contas.render();
+    }
+  },
+
+  _buildContexto() {
+    const hoje = Utils.dataHoje();
+    const contas  = Storage.contas();
+    const cartoes = Storage.cartoes();
+    const cats    = Storage.categorias();
+
+    const contasStr = contas.map(c =>
+      `- ${c.nome}(${c.tipo}) saldo:${Utils.moeda(Fin.saldoConta(c.id))} id:${c.id}`
+    ).join('\n');
+
+    const cartoesStr = cartoes.map(c => {
+      const ab = Fin.faturaAberta(c.id);
+      return `- ${c.nome} limite:${Utils.moeda(c.limite)} faturaAberta:${Utils.moeda(ab)} disponível:${Utils.moeda(c.limite-ab)} fechaDia:${c.diaFechamento} id:${c.id}`;
+    }).join('\n');
+
+    const catsStr = cats.map(c => `- ${c.ico}${c.nome}(${c.tipo}) id:${c.id}`).join('\n');
+
+    const dtMin = new Date(); dtMin.setDate(dtMin.getDate() - 45);
+    const recentes = Storage.transacoes()
+      .filter(t => t.data >= dtMin.toISOString().slice(0,10) && t.data <= hoje)
+      .sort((a,b) => b.data.localeCompare(a.data)).slice(0,25)
+      .map(t => {
+        const cat  = cats.find(c => c.id === t.categoria);
+        const conta = contas.find(c => c.id === t.contaId);
+        const card  = cartoes.find(c => c.id === t.cartaoId);
+        return `${t.data} ${t.tipo} R$${t.valor} "${t.descricao}" cat:${cat?.nome||'?'} onde:${card?.nome||conta?.nome||'-'}`;
+      }).join('\n');
+
+    const contaPadrao = contas.find(c => c.nome === 'Inter')?.id || contas[0]?.id || 'null';
+
+    return `Você é o assistente financeiro pessoal do usuário. Registre transações e responda perguntas sobre as finanças dele.
+DATA HOJE: ${hoje}
+
+CONTAS BANCÁRIAS:
+${contasStr||'(nenhuma)'}
+
+CARTÕES DE CRÉDITO:
+${cartoesStr||'(nenhum)'}
+
+CATEGORIAS DISPONÍVEIS:
+${catsStr}
+
+LANÇAMENTOS RECENTES (45 dias):
+${recentes||'(nenhum)'}
+
+REGRAS:
+- Responda SEMPRE em português brasileiro, direto e amigável (máx 2 linhas)
+- Conta padrão para gastos sem conta especificada: Inter id:${contaPadrao}
+- Para múltiplos gastos numa mensagem, crie uma transação para cada item
+- Para análises/relatórios/perguntas, responda no campo "resposta" sem ações
+- Se não souber conta/cartão com certeza, use null e informe na resposta
+
+RESPONDA SEMPRE EM JSON VÁLIDO sem markdown sem blocos de código:
+{"resposta":"texto amigável","acoes":[{"tipo":"transacao","dados":{"tipo":"despesa","valor":0.00,"descricao":"descrição","categoriaId":"id","contaId":"id-ou-null","cartaoId":"id-ou-null","data":"${hoje}"}}]}
+
+Para perguntas sem ação usar: {"resposta":"resposta aqui","acoes":[]}`;
+  },
+
+  // ── Regex (fallback sem chave de API) ─────────────────
+  _processarRegex(txt) {
     const t = txt.toLowerCase();
 
-    // Detectar se é pagamento de fatura
     if (/pagu|pagar|quero pagar|vou pagar/.test(t) && /fatura|cartão|cartao|nubank|inter|credito|crédito/.test(t)) {
-      this._abrirPagarFatura(txt);
-      return;
+      this._abrirPagarFatura(txt); return;
     }
-
-    // Detectar se é investimento
     if (/investi|apliquei|guardei|poupei|poupi|coloquei na poupan|coloquei no invest/.test(t)) {
       const valor = this._extrairValor(t);
       if (!valor) { this._addMsg('app', '❓ Não entendi o valor. Ex: "investi 500 hoje"', 'err'); return; }
@@ -880,10 +1034,9 @@ const Chat = {
       return;
     }
 
-    // Detectar se é receita
     const isReceita = /recebi|ganhei|entrou|entrada|pagaram|fui pago|depositaram/.test(t);
     const valor = this._extrairValor(t);
-    if (!valor) { this._addMsg('app', '❓ Não entendi o valor. Tente: "gastei 50 no mercado" ou "recebi 1000 de salário"', 'err'); return; }
+    if (!valor) { this._addMsg('app', '❓ Não entendi o valor. Tente: "gastei 50 no mercado" ou "recebi 1000 de salário"\n\n💡 Configure sua chave de IA em Config para falar naturalmente!', 'err'); return; }
 
     const tipo = isReceita ? 'receita' : 'despesa';
     const catNome = this._detectarCategoria(t);
@@ -893,10 +1046,8 @@ const Chat = {
                 cats.find(c => c.nome === 'Outros') || cats[0];
     const contas  = Storage.contas();
     const cartoes = Storage.cartoes();
-    // Detectar cartão pelo nome mencionado no texto
     const cartaoDetect = cartoes.find(c => t.includes(c.nome.toLowerCase()) ||
       c.nome.toLowerCase().split(' ').filter(w=>w.length>2).some(w => t.includes(w)));
-    // Detectar conta pelo nome mencionado (só se não achou cartão)
     const contaDetect = !cartaoDetect ? contas.find(c => t.includes(c.nome.toLowerCase()) ||
       c.nome.toLowerCase().split(' ').filter(w=>w.length>2).some(w => t.includes(w))) : null;
     const cartaoId = cartaoDetect?.id || null;
@@ -2725,6 +2876,19 @@ Telas.config = {
     el.innerHTML = `
       <div class="sec-header"><h1 class="sec-titulo">⚙️ Configurações</h1></div>
 
+      <div class="card" style="margin-bottom:16px;border:1px solid rgba(108,99,255,0.4)">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:6px">🤖 Assistente com IA (Claude)</h2>
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Com a chave configurada, o chat entende linguagem natural: "gastei 23,87 no mercado com energético", "quanto gastei esse mês?", etc.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="ia-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off"
+            style="flex:1;min-width:200px;background:var(--sup2);border:1px solid var(--borda);border-radius:8px;padding:10px 12px;color:var(--txt);font-size:13px;font-family:monospace"
+            value="${localStorage.getItem('anthropic_key')||''}">
+          <button class="btn btn-prim" onclick="Telas.config.salvarChaveIA()">Salvar</button>
+          <button class="btn btn-ghost" onclick="Telas.config.removerChaveIA()">Remover</button>
+        </div>
+        <p style="font-size:11px;color:var(--txt2);margin-top:8px">A chave fica salva só neste dispositivo. Crie em <strong>console.anthropic.com</strong> → API Keys.</p>
+      </div>
+
       <div class="card" style="margin-bottom:16px">
         <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">💾 Backup de Dados</h2>
         <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Exporte todos os seus dados como JSON. Guarde o arquivo com segurança.</p>
@@ -2802,6 +2966,19 @@ Telas.config = {
       <div style="text-align:center;font-size:11px;color:var(--txt2);padding:10px">
         Controle Financeiro Offline v1.0 • Dados salvos localmente
       </div>`;
+  },
+  salvarChaveIA() {
+    const val = (document.getElementById('ia-key-input')?.value || '').trim();
+    if (!val) { Utils.toast('Digite a chave antes de salvar.'); return; }
+    if (!val.startsWith('sk-ant-')) { Utils.toast('Chave inválida — deve começar com sk-ant-'); return; }
+    localStorage.setItem('anthropic_key', val);
+    Utils.toast('✅ Chave salva! O assistente já usa IA.');
+  },
+  removerChaveIA() {
+    localStorage.removeItem('anthropic_key');
+    const el = document.getElementById('ia-key-input');
+    if (el) el.value = '';
+    Utils.toast('Chave removida. Chat voltou ao modo básico.');
   },
   zerarERestaurar() {
     Modal.confirmar('Apagar TUDO e recarregar com os dados padrão?', () => {
