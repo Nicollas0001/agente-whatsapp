@@ -1572,6 +1572,35 @@ const Fin = {
       res.push({ mes: ref.mes, ano: ref.ano, label: new Date(ref.ano, ref.mes-1, 1).toLocaleDateString('pt-BR',{month:'short'}), ...r });
     }
     return res;
+  },
+  evolucaoSaldoMensal(nMeses) {
+    const resultado = [];
+    const hoje = new Date();
+    for (let i = nMeses - 1; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      const dataFim = `${ultimoDia.getFullYear()}-${String(ultimoDia.getMonth()+1).padStart(2,'0')}-${String(ultimoDia.getDate()).padStart(2,'0')}`;
+      const saldoTotal = Storage.contas().reduce((acc, conta) => {
+        let s = conta.saldoInicial || 0;
+        for (const t of Storage.transacoes()) {
+          if (t.data > dataFim) continue;
+          if (t.tipo === 'receita'       && t.contaId === conta.id) s += t.valor;
+          if (t.tipo === 'despesa'       && t.contaId === conta.id) s -= t.valor;
+          if (t.tipo === 'fatura_cartao' && t.contaId === conta.id) s -= t.valor;
+          if (t.tipo === 'transferencia' && t.contaId === conta.id) s -= t.valor;
+          if (t.tipo === 'transferencia' && t.contaDestinoId === conta.id) s += t.valor;
+        }
+        return acc + s;
+      }, 0);
+      const mes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][d.getMonth()];
+      resultado.push({ label: `${mes}/${String(d.getFullYear()).slice(2)}`, saldo: saldoTotal });
+    }
+    return resultado;
+  },
+  gastoCategoriaMes(catId, mes, ano) {
+    return Storage.transacoes()
+      .filter(t => t.tipo === 'despesa' && t.categoria === catId && Utils.datasNoMes(t.data, mes, ano))
+      .reduce((a, t) => a + t.valor, 0);
   }
 };
 
@@ -1895,6 +1924,50 @@ const Graf = {
       ctx.fillStyle = '#9A9ABF'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(dados[i].label, x, H - 6);
     }
+  },
+  barrasEvolucao(canvasId, dados) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!dados.length) return;
+    const pad = 36;
+    const chartH = H - 36;
+    const minV = Math.min(...dados.map(d => d.saldo));
+    const maxV = Math.max(...dados.map(d => d.saldo));
+    const range = maxV - minV || 1;
+    const pts = dados.map((d, i) => ({
+      x: pad + (i / (dados.length - 1 || 1)) * (W - pad * 2),
+      y: chartH - ((d.saldo - minV) / range) * (chartH - 20) - 4,
+      saldo: d.saldo,
+      label: d.label
+    }));
+    // Draw fill
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, chartH);
+    pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts[pts.length-1].x, chartH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(108,99,255,0.15)';
+    ctx.fill();
+    // Draw line
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = '#6C63FF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Draw dots + labels
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = p.saldo >= 0 ? '#06D6A0' : '#EF476F';
+      ctx.fill();
+      ctx.fillStyle = '#9A9ABF';
+      ctx.fillText(p.label, p.x, H - 4);
+    });
   }
 };
 
@@ -2671,6 +2744,31 @@ Telas.dashboard = {
     const totalCatDep = cats.reduce((a,c) => a+c.total, 0);
     const resCls = fluxo.resultado >= 0 ? 'pos' : 'neg';
 
+    // Metas por categoria
+    const metasObj = Storage.metas();
+    const allCatsDesp = Storage.categorias().filter(c => c.tipo !== 'receita');
+    const metasComs = allCatsDesp.filter(c => metasObj[c.id] > 0);
+    let metasHtml = '';
+    if (metasComs.length) {
+      metasHtml = `<h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">🎯 Metas do Mês</h2><div class="card">`;
+      for (const c of metasComs) {
+        const meta = metasObj[c.id];
+        const gasto = Fin.gastoCategoriaMes(c.id, mes, ano);
+        const pct = Math.min(100, Math.round(gasto / meta * 100));
+        const corBarra = pct < 70 ? 'var(--receita)' : pct < 90 ? 'var(--aviso)' : 'var(--despesa)';
+        metasHtml += `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span>${c.ico} ${Utils.esc(c.nome)}: <strong>${Utils.moeda(gasto)}</strong> / ${Utils.moeda(meta)}</span>
+            <span style="color:${corBarra};font-weight:700">${pct}%</span>
+          </div>
+          <div style="background:var(--sup2);border-radius:4px;height:6px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${corBarra};border-radius:4px;transition:width .3s"></div>
+          </div>
+        </div>`;
+      }
+      metasHtml += `</div>`;
+    }
+
     el.innerHTML = chatHtml + alertaHtml + tabBar + mesNav + `
       <div class="card-resumo" style="grid-template-columns:repeat(3,1fr)">
         <div class="card c-receita">
@@ -2690,6 +2788,7 @@ Telas.dashboard = {
         </div>
       </div>
       ${cartoesHtml}
+      ${metasHtml}
       ${orcHtml}
       ${cats.length ? `
         <h2 style="font-size:15px;font-weight:700;margin:20px 0 12px">Gastos por Categoria</h2>
@@ -2890,7 +2989,7 @@ Telas.relatorios = {
     const { mes, ano } = this._ref;
     const el = document.getElementById('rel-aba-conteudo');
     if (!el) return;
-    if (this._aba === 'resumo')    { el.innerHTML = this._htmlResumo(mes,ano); }
+    if (this._aba === 'resumo')    { el.innerHTML = this._htmlResumo(mes,ano); setTimeout(()=>this._drawSaldoEvolucao(),50); }
     if (this._aba === 'categoria') { el.innerHTML = this._htmlCategorias(mes,ano); }
     if (this._aba === 'faturas')   { el.innerHTML = this._htmlFaturas(mes,ano); }
     if (this._aba === 'evolucao')  { el.innerHTML = this._htmlEvolucao(); setTimeout(()=>this._drawEvolucao(),50); }
@@ -2925,7 +3024,15 @@ Telas.relatorios = {
         <div class="rel-barra-wrap"><div class="rel-barra" style="width:${c.total/maxR*100}%;background:${c.cor}"></div></div>
         <div class="rel-val" style="color:var(--receita)">${Utils.moeda(c.total)}</div>
         <div class="rel-pct">${c.pct}%</div>
-      </div>`).join('')}</div>`:''}`;
+      </div>`).join('')}</div>`:''}
+    <h3 style="font-size:13px;font-weight:700;color:var(--txt2);margin:20px 0 10px">EVOLUÇÃO DO SALDO (6 MESES)</h3>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="cv-saldo-evo" width="600" height="180"></canvas></div>
+    </div>`;
+  },
+  _drawSaldoEvolucao() {
+    const dados = Fin.evolucaoSaldoMensal(6);
+    Graf.barrasEvolucao('cv-saldo-evo', dados);
   },
   _htmlCategorias(mes,ano) {
     const desp = Fin.despesasPorCategoria(mes,ano);
@@ -3191,6 +3298,31 @@ Telas.config = {
       </div>
 
       <div class="card" style="margin-bottom:16px">
+        <h2>🔔 Notificações de Vencimento</h2>
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Aviso automático quando fatura está próxima do vencimento.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <label>Ativo</label>
+          <input type="checkbox" id="notif-ativo" ${Storage.notifConfig().ativo?'checked':''} onchange="Telas.config.salvarNotif()">
+          <label>Avisar</label>
+          <input type="number" id="notif-dias" value="${Storage.notifConfig().diasAntes}" min="1" max="7" style="width:50px">
+          <label>dias antes</label>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="Telas.config.testarNotif()">🔔 Testar notificação</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">🎯 Metas por Categoria</h2>
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Defina um limite mensal de gastos por categoria.</p>
+        <div id="metas-cat-lista">
+          ${cats.filter(c=>c.tipo!=='receita').map(c=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="min-width:120px;font-size:13px">${c.ico} ${Utils.esc(c.nome)}</span>
+            <input type="number" step="10" min="0" placeholder="0 = sem meta" data-cat-id="${c.id}" value="${Storage.metas()[c.id]||''}" style="width:100px;background:var(--sup2);border:1px solid var(--borda);border-radius:6px;padding:6px 8px;color:var(--txt);font-size:13px">
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-prim btn-sm" style="margin-top:10px" onclick="Telas.config.salvarMetas()">💾 Salvar metas</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
         <h2 style="font-size:14px;font-weight:700;margin-bottom:12px">ℹ️ Como usar</h2>
         <ul style="font-size:13px;color:var(--txt2);line-height:2;padding-left:18px">
           <li>Cadastre suas <strong>contas</strong> bancárias e <strong>cartões</strong> primeiro.</li>
@@ -3205,6 +3337,37 @@ Telas.config = {
       <div style="text-align:center;font-size:11px;color:var(--txt2);padding:10px">
         Controle Financeiro Offline v1.0 • Dados salvos localmente
       </div>`;
+  },
+  salvarNotif() {
+    const ativo = document.getElementById('notif-ativo')?.checked || false;
+    const diasAntes = parseInt(document.getElementById('notif-dias')?.value) || 3;
+    Storage.salvarNotifConfig({ ativo, diasAntes });
+    if (ativo) pedirPermissaoNotif().then(ok => {
+      if (!ok) Utils.toast('Permissão de notificação negada pelo navegador.');
+      else { Utils.toast('Notificações ativadas!'); verificarVencimentos(); }
+    });
+    else Utils.toast('Notificações desativadas.');
+  },
+  testarNotif() {
+    pedirPermissaoNotif().then(ok => {
+      if (!ok) { Utils.toast('Permissão negada — habilite notificações no navegador.'); return; }
+      new Notification('🔔 Teste de notificação', {
+        body: 'Fatura CartãoX vence em 2 dias — R$ 350,00',
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💳</text></svg>'
+      });
+      Utils.toast('Notificação de teste enviada!');
+    });
+  },
+  salvarMetas() {
+    const inputs = document.querySelectorAll('#metas-cat-lista input[data-cat-id]');
+    const metas = {};
+    inputs.forEach(inp => {
+      const val = parseFloat(inp.value);
+      if (!isNaN(val) && val > 0) metas[inp.dataset.catId] = val;
+    });
+    Storage.salvarMetas(metas);
+    Utils.toast('Metas salvas!');
+    if (Router.atual === 'dashboard') Telas.dashboard.render();
   },
   salvarChaveIA() {
     const val = (document.getElementById('ia-key-input')?.value || '').trim();
@@ -3649,6 +3812,7 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
   Chat.init();
   verificarRecompensa();
   verificarFixos();
+  verificarVencimentos();
   Router.init();
 
   // Avisa se parece ser primeira abertura após atualização de arquivo
