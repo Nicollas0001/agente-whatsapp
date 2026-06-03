@@ -1424,10 +1424,14 @@ const Fin = {
     const fd = cartao.diaFechamento;
     const ant = Utils.addMes(mes, ano, -1);
     const ultimoDiaAnt = Utils.ultimoDia(ant.mes, ant.ano).getDate();
-    const diaIni = Math.min(fd, ultimoDiaAnt) + 1;
+    // Período começa NO dia de fechamento do mês anterior
+    const diaIni = Math.min(fd, ultimoDiaAnt);
     const inicio = new Date(ant.ano, ant.mes - 1, diaIni);
     const ultimoDiaMes = Utils.ultimoDia(mes, ano).getDate();
-    const fim = new Date(ano, mes - 1, Math.min(fd, ultimoDiaMes));
+    // Período termina NO DIA ANTERIOR ao fechamento (dia 4 fecha → último dia do período = dia 3)
+    // new Date(ano, mes-1, 0) retorna último dia do mês anterior — cobre o caso fd=1
+    const fimDia = Math.min(fd, ultimoDiaMes) - 1;
+    const fim = fimDia < 1 ? new Date(ant.ano, ant.mes - 1, ultimoDiaAnt) : new Date(ano, mes - 1, fimDia);
     const dv = cartao.diaVencimento;
     const vencimento = new Date(ano, mes - 1, Math.min(dv, ultimoDiaMes));
     return { inicio, fim, vencimento };
@@ -1457,9 +1461,9 @@ const Fin = {
     const hoje = new Date();
     const diaHoje = hoje.getDate();
     const { mes, ano } = Utils.mesAtual();
-    // Se hoje passou do dia de fechamento, o período atual já fechou → aberto é o próximo mês
-    const fechado = diaHoje > cartao.diaFechamento ? { mes, ano } : Utils.addMes(mes, ano, -1);
-    const aberto  = diaHoje > cartao.diaFechamento ? Utils.addMes(mes, ano, 1) : { mes, ano };
+    // No dia do fechamento (ou depois), a fatura já fechou → aberta é a do próximo mês
+    const fechado = diaHoje >= cartao.diaFechamento ? { mes, ano } : Utils.addMes(mes, ano, -1);
+    const aberto  = diaHoje >= cartao.diaFechamento ? Utils.addMes(mes, ano, 1) : { mes, ano };
     return { fechado, aberto };
   },
   faturaFechada(cartaoId) {
