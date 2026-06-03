@@ -2886,6 +2886,7 @@ Telas.dashboard = {
           <div style="font-size:10px;color:var(--txt2);margin-top:2px">entrou − saiu</div>
         </div>
       </div>
+      ${recTxHtml}
       ${investProgressHtml}
       ${cartoesHtml}
       ${metasHtml}
@@ -2902,8 +2903,7 @@ Telas.dashboard = {
             </div>`).join('')}
           </div>
         </div>` : ''}
-      ${cortesHtml}
-      ${recTxHtml}`;
+      ${cortesHtml}`;
     if (cats.length) Graf.donut('cv-donut', cats, totalCatDep);
     Chat.renderHistorico();
   },
