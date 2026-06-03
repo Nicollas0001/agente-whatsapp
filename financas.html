@@ -1194,7 +1194,8 @@ REGRAS:
 - Para múltiplos gastos numa mensagem, crie uma transação para cada
 - NUNCA diga que não pode alterar algo no app — você pode, use a ação correta
 - Se o usuário pedir para alterar limite de cartão, use ação "atualizar_cartao"
-- Se o usuário pedir para ajustar saldo de conta, use ação "atualizar_conta"
+- "atualizar_conta" é SOMENTE para corrigir saldo manualmente (ex: "define o saldo do inter como 440", "ajusta saldo", "o saldo está em X")
+- "entrou X", "recebi X", "caiu X", "salário de X", "receita de X", "ganhei X" → SEMPRE use transacao tipo "receita", NUNCA atualizar_conta
 
 ⚠️ REGRA CRÍTICA — NUNCA IGNORE:
 O array "acoes" é o que REALMENTE executa as mudanças no app.
@@ -1204,8 +1205,11 @@ NUNCA diga que fez algo se não colocou a ação em "acoes".
 
 RESPONDA SEMPRE EM JSON VÁLIDO sem markdown sem blocos de código:
 
-Para registrar gasto/receita:
+Para registrar gasto (despesa):
 {"resposta":"texto","acoes":[{"tipo":"transacao","dados":{"tipo":"despesa","valor":0.00,"descricao":"descrição","categoriaId":"id","contaId":"id-ou-null","cartaoId":"id-ou-null","data":"${hoje}"}}]}
+
+Para registrar entrada de dinheiro (receita) — "entrou X", "recebi X", "caiu X na conta", "salário", "ganhei X":
+{"resposta":"texto","acoes":[{"tipo":"transacao","dados":{"tipo":"receita","valor":0.00,"descricao":"descrição","categoriaId":"id-categoria-receita","contaId":"id-da-conta","cartaoId":null,"data":"${hoje}"}}]}
 
 Para remover último lançamento:
 {"resposta":"texto","acoes":[{"tipo":"remover_transacao","dados":{"ultima":true}}]}
