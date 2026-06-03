@@ -584,6 +584,10 @@ const Storage = {
   salvarMetaInvest(v)  { this.set('metainvest', v); },
   recompensas()        { return this.get('recompensas') || []; },
   salvarRecompensas(v) { this.set('recompensas', v); },
+  notifConfig()        { return this.get('notifcfg') || { ativo: false, diasAntes: 3 }; },
+  salvarNotifConfig(v) { this.set('notifcfg', v); },
+  metas()              { return this.get('metas') || {}; },
+  salvarMetas(v)       { this.set('metas', v); },
   chatHistorico()      { return this.get('chathist') || []; },
   salvarChatHistorico(v){ this.set('chathist', v); },
   exportar() {
@@ -835,6 +839,48 @@ function verificarFixos() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   NOTIFICAÇÕES DE VENCIMENTO
+═══════════════════════════════════════════════════════════ */
+async function pedirPermissaoNotif() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+function verificarVencimentos() {
+  const cfg = Storage.notifConfig();
+  if (!cfg.ativo) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth() + 1;
+  const anoAtual = hoje.getFullYear();
+  const chaveEnvio = `ff_notif_sent_${anoAtual}-${String(mesAtual).padStart(2,'0')}`;
+  const enviados = JSON.parse(localStorage.getItem(chaveEnvio) || '[]');
+  const cartoes = Storage.cartoes();
+  let novoEnvio = false;
+  for (const cartao of cartoes) {
+    const diaVenc = cartao.diaVencimento || 1;
+    let dataVenc = new Date(anoAtual, mesAtual - 1, diaVenc);
+    if (dataVenc < hoje) dataVenc = new Date(anoAtual, mesAtual, diaVenc);
+    const diffMs = dataVenc - hoje;
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (days >= 0 && days <= cfg.diasAntes && !enviados.includes(cartao.id)) {
+      const { fechado } = Fin._periodosFatura(cartao);
+      const valor = Fin.faturaCartao(cartao.id, fechado.mes, fechado.ano);
+      new Notification('Fatura vencendo!', {
+        body: `Fatura ${cartao.nome} vence em ${days} dia${days!==1?'s':''} — ${Utils.moeda(valor)}`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💳</text></svg>'
+      });
+      enviados.push(cartao.id);
+      novoEnvio = true;
+    }
+  }
+  if (novoEnvio) localStorage.setItem(chaveEnvio, JSON.stringify(enviados));
+}
+
+/* ═══════════════════════════════════════════════════════════
    CHAT NLP  (entende português e cadastra automaticamente)
 ═══════════════════════════════════════════════════════════ */
 const NLP_MAPA = [
@@ -858,15 +904,91 @@ const NLP_MAPA = [
 
 const Chat = {
   _hist: [],
+  _modoRapido: false,
   init() { this._hist = Storage.chatHistorico().slice(-40); },
 
   async processar(txt) {
     txt = txt.trim();
     if (!txt) return;
     this._addMsg('user', txt);
+    if (this._modoRapido) { this._processarRegex(txt); return; }
     const key = localStorage.getItem('anthropic_key');
     if (key) await this._processarIA(txt, key);
     else this._processarRegex(txt);
+  },
+
+  toggleModoRapido() {
+    this._modoRapido = !this._modoRapido;
+    const btn = document.getElementById('chat-modo-btn');
+    if (btn) {
+      btn.textContent = this._modoRapido ? '⚡' : '🤖';
+      btn.title = this._modoRapido ? 'Modo rápido (sem IA) — clique para usar IA' : 'Modo IA — clique para modo rápido';
+    }
+    Utils.toast(this._modoRapido ? 'Modo rápido ativado — sem IA' : 'Modo IA ativado');
+  },
+
+  async abrirFoto() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const apiKey = localStorage.getItem('anthropic_key');
+      if (!apiKey) { Utils.toast('Configure a chave de IA em Config para usar esta função.'); return; }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target.result.split(',')[1];
+        const mediaType = file.type || 'image/jpeg';
+        const chatEl = document.getElementById('chat-hist');
+        const loadDiv = document.createElement('div');
+        loadDiv.className = 'chat-msg app';
+        loadDiv.style.opacity = '0.6';
+        loadDiv.textContent = '📷 Analisando recibo…';
+        if (chatEl) { chatEl.appendChild(loadDiv); chatEl.scrollTop = chatEl.scrollHeight; }
+        try {
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 256,
+              messages: [{ role: 'user', content: [
+                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+                { type: 'text', text: 'Extraia o valor total e a descrição deste recibo/cupom fiscal. Responda em JSON: {"valor": 0.00, "descricao": "descrição curta"}' }
+              ]}]
+            })
+          });
+          if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
+          if (!resp.ok) throw new Error('Erro ao analisar imagem');
+          const data = await resp.json();
+          const text = data.content[0]?.text || '';
+          let valor = 0, descricao = 'compra';
+          try {
+            const clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+            const m = clean.match(/\{[\s\S]*\}/);
+            if (m) { const p = JSON.parse(m[0]); valor = p.valor || 0; descricao = p.descricao || 'compra'; }
+          } catch(e) {}
+          const chatInput = document.getElementById('chat-txt');
+          if (chatInput) {
+            chatInput.value = `gastei R$${valor.toFixed(2).replace('.',',')} em ${descricao}`;
+            chatInput.focus();
+          }
+          Utils.toast('📷 Recibo analisado! Confirme ou edite antes de enviar.');
+        } catch(err) {
+          if (chatEl && loadDiv.parentNode) chatEl.removeChild(loadDiv);
+          Utils.toast('Erro ao analisar foto: ' + err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   },
 
   // ── IA: Claude API ────────────────────────────────────
@@ -2448,6 +2570,8 @@ Telas.dashboard = {
         <div class="chat-input-row">
           <textarea id="chat-txt" placeholder='Ex: gastei 50 no mercado&#10;recebi 3000 de salário&#10;investi 500 hoje' rows="1"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''}"></textarea>
+          <button id="chat-modo-btn" class="chat-send" style="font-size:16px;padding:0 10px" title="${Chat._modoRapido ? 'Modo rápido (sem IA) — clique para usar IA' : 'Modo IA — clique para modo rápido'}" onclick="Chat.toggleModoRapido()">${Chat._modoRapido ? '⚡' : '🤖'}</button>
+          <button class="chat-send" style="font-size:16px;padding:0 10px" title="Tirar foto de recibo para extrair valor automaticamente" onclick="Chat.abrirFoto()">📷</button>
           <button class="chat-send" onclick="Chat.processar(document.getElementById('chat-txt').value);document.getElementById('chat-txt').value=''">➤</button>
         </div>
       </div>`;
