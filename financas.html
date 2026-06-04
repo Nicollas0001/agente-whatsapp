@@ -1182,7 +1182,7 @@ LANÇAMENTOS RECENTES (45 dias):
 ${recentes||'(nenhum)'}
 
 O QUE VOCÊ PODE FAZER DIRETAMENTE NO APP:
-1. Registrar transações (despesas, receitas, compras no cartão)
+1. Registrar transações (despesas, receitas, compras no cartão, pagamento de fatura)
 2. Remover o último lançamento ou um lançamento específico
 3. Alterar limite de cartão de crédito
 4. Ajustar saldo de conta bancária
@@ -1196,6 +1196,7 @@ REGRAS:
 - Se o usuário pedir para alterar limite de cartão, use ação "atualizar_cartao"
 - "atualizar_conta" é SOMENTE para corrigir saldo manualmente (ex: "define o saldo do inter como 440", "ajusta saldo", "o saldo está em X")
 - "entrou X", "recebi X", "caiu X", "salário de X", "receita de X", "ganhei X" → SEMPRE use transacao tipo "receita", NUNCA atualizar_conta
+- "paguei a fatura", "paguei o cartão", "quitei a fatura" → SEMPRE use transacao tipo "fatura_cartao" com o cartaoId correto e contaId de onde saiu o dinheiro
 
 ⚠️ REGRA CRÍTICA — NUNCA IGNORE:
 O array "acoes" é o que REALMENTE executa as mudanças no app.
@@ -1219,6 +1220,9 @@ Para alterar limite do cartão:
 
 Para ajustar saldo da conta:
 {"resposta":"texto","acoes":[{"tipo":"atualizar_conta","dados":{"contaId":"id","novoSaldo":0.00}}]}
+
+Para pagar fatura de cartão — "paguei a fatura do X", "paguei o cartão", "quitei fatura" (debita da conta, abate da fatura do cartão):
+{"resposta":"texto","acoes":[{"tipo":"transacao","dados":{"tipo":"fatura_cartao","valor":0.00,"descricao":"Pagamento fatura NomeCartão","categoriaId":null,"contaId":"id-conta-de-onde-saiu","cartaoId":"id-do-cartao","data":"${hoje}"}}]}
 
 Para perguntas sem ação:
 {"resposta":"resposta aqui","acoes":[]}`;
