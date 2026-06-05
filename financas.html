@@ -31,7 +31,23 @@ body {
   color: var(--txt);
   overflow-x: hidden;
 }
-#app { display: flex; flex-direction: column; height: 100vh; }
+/* ── CAPA DE FUNDO (aurora animada) ───────────────────── */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 12% -5%,  rgba(108,99,255,.28), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 100% 8%,  rgba(6,214,160,.18),  transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 108%, rgba(108,99,255,.16), transparent 60%),
+    radial-gradient(circle   40% at 85% 70%,      rgba(255,100,180,.08), transparent 60%);
+  animation: auroraDrift 26s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  0%   { transform: translate3d(0,0,0)        scale(1);    opacity: .9; }
+  50%  { transform: translate3d(2.5%,2%,0)    scale(1.08); opacity: 1;  }
+  100% { transform: translate3d(-2%,-1.5%,0)  scale(1.05); opacity: .92;}
+}
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+#app { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
 
 /* ── NAV ─────────────────────────────────────────────── */
 #nav {
@@ -64,11 +80,13 @@ body {
 
 /* ── CARDS ────────────────────────────────────────────── */
 .card {
-  background: var(--sup);
+  background: rgba(26,26,46,.82);
   border: 1px solid var(--borda);
   border-radius: var(--raio);
   padding: 16px;
   box-shadow: var(--sombra);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 .card-grid {
   display: grid;
@@ -406,6 +424,39 @@ canvas { display: block; }
 .inv-streak-item.ok   { background:rgba(6,214,160,.15);border:1px solid rgba(6,214,160,.2); }
 .inv-streak-item.miss { background:rgba(239,71,111,.08);border:1px solid rgba(239,71,111,.15); }
 .inv-streak-item.zero { background:var(--sup2);border:1px solid var(--borda); }
+/* ── HERO DE BOAS-VINDAS (HOME) ───────────────────────── */
+.home-hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba(108,99,255,.30) 0%, rgba(6,214,160,.14) 55%, rgba(20,20,40,.55) 100%);
+  border: 1px solid rgba(108,99,255,.35);
+  border-radius: 18px; padding: 18px 18px 16px; margin-bottom: 14px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 30px rgba(108,99,255,.18);
+}
+.home-hero::before {
+  content: ''; position: absolute; top: -60px; right: -40px; width: 180px; height: 180px;
+  background: radial-gradient(circle, rgba(6,214,160,.22), transparent 70%);
+  border-radius: 50%; pointer-events: none;
+}
+.hh-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; position: relative; }
+.hh-greet { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.hh-frase { font-size: 12.5px; color: rgba(233,236,239,.78); font-style: italic; margin-top: 6px; line-height: 1.55; max-width: 92%; }
+.hh-score { flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-weight: 800; border: 2px solid; background: rgba(15,15,26,.45); }
+.hh-score-num { font-size: 17px; line-height: 1; }
+.hh-score-lbl { font-size: 8px; opacity: .8; margin-top: 1px; letter-spacing: .5px; }
+.hh-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 16px; }
+.hh-stat { background: rgba(15,15,26,.35); border-radius: 12px; padding: 9px 8px; text-align: center; }
+.hh-stat-lbl { font-size: 9.5px; color: rgba(233,236,239,.6); text-transform: uppercase; letter-spacing: .5px; }
+.hh-stat-val { font-size: 15px; font-weight: 800; margin-top: 3px; }
+.hh-bar { height: 6px; background: rgba(255,255,255,.10); border-radius: 4px; overflow: hidden; margin-top: 14px; }
+.hh-bar-fill { height: 100%; background: linear-gradient(90deg,#06D6A0,#6C63FF); border-radius: 4px; transition: width .6s ease; }
+.hh-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hh-liberdade { font-size: 11px; color: rgba(233,236,239,.72); }
+.hh-cta { background: linear-gradient(135deg,#06D6A0,#5A52D5); color: #fff; border: none; border-radius: 10px;
+  padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 14px rgba(6,214,160,.3); transition: transform .15s; }
+.hh-cta:active { transform: scale(.96); }
 /* ── ALERTA INVESTIMENTO ──────────────────────────────── */
 .alerta-invest {
   border-radius: var(--raio-sm); padding: 12px 14px; margin-bottom: 14px;
@@ -2870,7 +2921,8 @@ Telas.dashboard = {
   render() {
     const el = document.getElementById('tela-dashboard');
     const { mes, ano } = this._ref;
-    const chatHtml = `
+    const heroHtml = this._htmlHero();
+    const chatHtml = heroHtml + `
       <div class="chat-wrap">
         <div class="chat-historico" id="chat-hist" style="max-height:200px;overflow-y:auto"></div>
         <div class="chat-input-row">
@@ -3141,6 +3193,97 @@ Telas.dashboard = {
       ${cortesHtml}`;
     if (cats.length) Graf.donut('cv-donut', cats, totalCatDep);
     Chat.renderHistorico();
+  },
+
+  _frases: [
+    'Cada real investido hoje é um soldado trabalhando pela sua liberdade.',
+    'Disciplina é escolher o que você quer mais — liberdade — no lugar do que quer agora.',
+    'No tatame e nas finanças: consistência vence talento.',
+    'O perfume é a recompensa. A liberdade é o objetivo.',
+    'Juros compostos são a faixa preta do dinheiro: levam tempo, mas são imbatíveis.',
+    'Quem investe primeiro e gasta o que sobra sempre sai na frente.',
+    'Hoje você planta. Amanhã o dinheiro luta por você.',
+    'Construir patrimônio é arte — e você está dominando o golpe.',
+    'Pequenos aportes, repetidos, viram independência.',
+    'O rico compra liberdade; a maioria compra aparência. Você está comprando liberdade.',
+    'Seu eu do futuro agradece cada R$900 investido.',
+    'Foco no aporte. O resto é ruído.',
+    'Cada mês na meta é um round vencido contra a inflação.',
+    'Riqueza é silenciosa: cresce enquanto você dorme.',
+    'Liberdade financeira não é sorte, é hábito — e o hábito você já tem.',
+  ],
+
+  _htmlHero() {
+    const nome      = 'Nicollas';
+    const h         = new Date().getHours();
+    const saudacao  = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    const emoji     = h < 12 ? '☀️' : h < 18 ? '🌤️' : '🌙';
+    // frase do dia (estável dentro do mesmo dia)
+    const dia       = Math.floor(Date.now() / 86400000);
+    const frase     = this._frases[dia % this._frases.length];
+
+    const patrimonio = Fin.patrimonioTotal();
+    const score      = Fin.scoreInvestidor();
+    const alvo       = Storage.patrimonioAlvo();
+    const metaInv    = Storage.metaInvest();
+    const taxa       = Storage.taxaInvest() / 100;
+    const libPct     = Math.min(100, patrimonio > 0 ? Math.round(patrimonio / alvo * 100) : 0);
+    const mesesLib   = Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo);
+    const dataLib    = (() => {
+      const d = new Date(); d.setMonth(d.getMonth() + mesesLib);
+      const m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      return `${m[d.getMonth()]}/${d.getFullYear()}`;
+    })();
+
+    // sequência de meses batendo a meta de aporte
+    const { mes, ano } = Utils.mesAtual();
+    let streak = 0;
+    for (let i = 0; i < 24; i++) {
+      const ref = Utils.addMes(mes, ano, -i);
+      const v = Storage.investimentos()
+        .filter(x => Utils.datasNoMes(x.data, ref.mes, ref.ano))
+        .reduce((s,x) => s + x.valor, 0);
+      if (v >= metaInv && v > 0) streak++;
+      else if (i === 0) continue; // mês atual ainda em andamento não quebra
+      else break;
+    }
+
+    const scoreClr = score >= 80 ? '#06D6A0' : score >= 50 ? '#FFD166' : '#EF476F';
+
+    return `
+      <div class="home-hero">
+        <div class="hh-top">
+          <div>
+            <div class="hh-greet">${saudacao}, ${nome} ${emoji}</div>
+            <div class="hh-frase">"${frase}"</div>
+          </div>
+          <div class="hh-score" style="border-color:${scoreClr};color:${scoreClr}">
+            <span class="hh-score-num">${score}</span>
+            <span class="hh-score-lbl">SCORE</span>
+          </div>
+        </div>
+        <div class="hh-stats">
+          <div class="hh-stat">
+            <div class="hh-stat-lbl">Patrimônio</div>
+            <div class="hh-stat-val" style="color:var(--receita)">${Utils.moeda(patrimonio)}</div>
+          </div>
+          <div class="hh-stat">
+            <div class="hh-stat-lbl">Liberdade</div>
+            <div class="hh-stat-val">${libPct}%</div>
+          </div>
+          <div class="hh-stat">
+            <div class="hh-stat-lbl">Sequência</div>
+            <div class="hh-stat-val">${streak > 0 ? `🔥 ${streak}` : '—'}</div>
+          </div>
+        </div>
+        <div class="hh-bar"><div class="hh-bar-fill" style="width:${libPct}%"></div></div>
+        <div class="hh-foot">
+          <span class="hh-liberdade">${mesesLib < 600
+            ? `🏁 Liberdade prevista: <strong style="color:#fff">${dataLib}</strong> · faltam ${mesesLib} meses`
+            : '🏁 Comece a investir para projetar sua liberdade'}</span>
+          <button class="hh-cta" onclick="location.hash='investimentos'">💎 Investir agora</button>
+        </div>
+      </div>`;
   },
 
   _htmlOrcamento(mes, ano) {
