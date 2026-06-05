@@ -1708,6 +1708,62 @@ const Fin = {
   },
   fvJurosCompostos(pmt, taxa, n, pvAtual) {
     return pmt * ((Math.pow(1 + taxa, n) - 1) / taxa) + pvAtual * Math.pow(1 + taxa, n);
+  },
+  projecaoMes(mes, ano) {
+    const hoje = new Date();
+    if (mes !== hoje.getMonth()+1 || ano !== hoje.getFullYear()) return null;
+    const diaHoje = hoje.getDate();
+    const diasMes = new Date(ano, mes, 0).getDate();
+    const diasRestantes = diasMes - diaHoje;
+    const fluxo = this.fluxoCaixa(mes, ano);
+    const ritmo = diaHoje > 0 ? fluxo.saidas / diaHoje : 0;
+    const log = Storage.fixosLog();
+    const mesAno = `${mes}-${ano}`;
+    const fixosPend = Storage.fixos().filter(f =>
+      f.ativo && f.dia > diaHoje &&
+      !log.some(l => l.fixoId === f.id && l.mesAno === mesAno)
+    );
+    const recPend  = fixosPend.filter(f => f.tipo === 'receita').reduce((a,f) => a+f.valor, 0);
+    const despPend = fixosPend.filter(f => f.tipo !== 'receita').reduce((a,f) => a+f.valor, 0);
+    const recProj   = fluxo.entradas + recPend;
+    const saidaProj = fluxo.saidas + ritmo * diasRestantes + despPend;
+    const saldoProj = recProj - saidaProj;
+    const metaInv   = Storage.metaInvest();
+    const investMes = Storage.investimentos()
+      .filter(i => Utils.datasNoMes(i.data, mes, ano))
+      .reduce((a,i) => a+i.valor, 0);
+    return { recProj, saidaProj, saldoProj, metaInv, investMes, ritmo, diasRestantes, recPend, despPend };
+  },
+  detectarAssinaturas() {
+    const txs = Storage.transacoes().filter(t => t.tipo === 'despesa');
+    const grupos = {};
+    for (const t of txs) {
+      const key = t.descricao.toLowerCase().trim().slice(0, 20);
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(t);
+    }
+    const assinaturas = [];
+    for (const [key, lista] of Object.entries(grupos)) {
+      if (lista.length < 2) continue;
+      const meses = new Set(lista.map(t => t.data.slice(0,7)));
+      if (meses.size < 2) continue;
+      const valores = lista.map(t => t.valor);
+      const med = valores.reduce((a,b)=>a+b,0)/valores.length;
+      const maxDev = Math.max(...valores.map(v=>Math.abs(v-med)/med));
+      if (maxDev > 0.15) continue;
+      const sorted = [...lista].sort((a,b) => b.data.localeCompare(a.data));
+      const cat = Storage.categorias().find(c => c.id === sorted[0].categoria);
+      assinaturas.push({
+        descricao: sorted[0].descricao,
+        valorMedio: med,
+        ocorrencias: lista.length,
+        meses: meses.size,
+        ultimaData: sorted[0].data,
+        ico: cat?.ico || '📦',
+        cor: cat?.cor || '#444',
+      });
+    }
+    return assinaturas.sort((a,b) => b.valorMedio - a.valorMedio);
   }
 };
 
@@ -2986,6 +3042,37 @@ Telas.dashboard = {
       recTxHtml += `</div>`;
     }
 
+    // ── Previsão de fim de mês ─────────────────────────────
+    const proj = Fin.projecaoMes(mes, ano);
+    let projecaoHtml = '';
+    if (proj) {
+      const sobraInvest = proj.saldoProj - (proj.metaInv - proj.investMes);
+      const clrSaldo = proj.saldoProj >= 0 ? 'var(--receita)' : 'var(--despesa)';
+      const clrInvest = sobraInvest >= proj.metaInv * 0.5 ? 'var(--receita)' : sobraInvest >= 0 ? 'var(--aviso)' : 'var(--despesa)';
+      projecaoHtml = `
+        <div class="card" style="border-left:3px solid var(--aviso);margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h2 style="font-size:14px;font-weight:700">🔮 Previsão — fim do mês</h2>
+            <span style="font-size:11px;color:var(--txt2)">${proj.diasRestantes} dias restantes</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--sup2);border-radius:8px;padding:10px">
+              <div style="font-size:10px;color:var(--txt2);margin-bottom:3px">SALDO PROJETADO</div>
+              <div style="font-size:16px;font-weight:700;color:${clrSaldo}">${Utils.moeda(proj.saldoProj)}</div>
+            </div>
+            <div style="background:var(--sup2);border-radius:8px;padding:10px">
+              <div style="font-size:10px;color:var(--txt2);margin-bottom:3px">PARA INVESTIR</div>
+              <div style="font-size:16px;font-weight:700;color:${clrInvest}">${Utils.moeda(Math.max(0, sobraInvest))}</div>
+            </div>
+          </div>
+          ${proj.recPend > 0 || proj.despPend > 0 ? `
+            <div style="font-size:11px;color:var(--txt2);margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
+              Fixos pendentes: ${proj.recPend > 0 ? `<span style="color:var(--receita)">+${Utils.moeda(proj.recPend)}</span>` : ''} ${proj.despPend > 0 ? `<span style="color:var(--despesa)">-${Utils.moeda(proj.despPend)}</span>` : ''}
+              · Ritmo: ${Utils.moeda(proj.ritmo)}/dia
+            </div>` : `<div style="font-size:11px;color:var(--txt2);margin-top:8px">Ritmo atual: ${Utils.moeda(proj.ritmo > 0 ? proj.ritmo : 0)}/dia</div>`}
+        </div>`;
+    }
+
     const orcHtml = this._htmlOrcamento(mes, ano);
     const totalCatDep = cats.reduce((a,c) => a+c.total, 0);
     const resCls = fluxo.resultado >= 0 ? 'pos' : 'neg';
@@ -3034,6 +3121,7 @@ Telas.dashboard = {
         </div>
       </div>
       ${recTxHtml}
+      ${projecaoHtml}
       ${investProgressHtml}
       ${cartoesHtml}
       ${metasHtml}
@@ -3201,6 +3289,7 @@ Telas.relatorios = {
         <button class="tab-btn${this._aba==='faturas'?' ativo':''}" onclick="Telas.relatorios._aba='faturas';Telas.relatorios._renderAba()">Faturas</button>
         <button class="tab-btn${this._aba==='evolucao'?' ativo':''}" onclick="Telas.relatorios._aba='evolucao';Telas.relatorios._renderAba()">Evolução</button>
         <button class="tab-btn${this._aba==='conquistas'?' ativo':''}" onclick="Telas.relatorios._aba='conquistas';Telas.relatorios._renderAba()">Conquistas</button>
+        <button class="tab-btn${this._aba==='assinaturas'?' ativo':''}" onclick="Telas.relatorios._aba='assinaturas';Telas.relatorios._renderAba()">Assinaturas</button>
       </div>
       <div id="rel-aba-conteudo"></div>`;
     this._renderAba();
@@ -3230,18 +3319,20 @@ Telas.relatorios = {
     this.render();
   },
   _renderAba() {
+    const abaMap = {categoria:'cat',faturas:'fat',evolucao:'evo',conquistas:'con',assinaturas:'ass'};
+    const prefix = abaMap[this._aba] || 'res';
     document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.toggle('ativo', b.textContent.toLowerCase().startsWith(
-        this._aba==='categoria'?'cat':this._aba==='faturas'?'fat':this._aba==='evolucao'?'evo':'res'));
+      b.classList.toggle('ativo', b.textContent.toLowerCase().startsWith(prefix));
     });
     const { mes, ano } = this._ref;
     const el = document.getElementById('rel-aba-conteudo');
     if (!el) return;
-    if (this._aba === 'resumo')    { el.innerHTML = this._htmlResumo(mes,ano); setTimeout(()=>this._drawSaldoEvolucao(),50); }
-    if (this._aba === 'categoria') { el.innerHTML = this._htmlCategorias(mes,ano); }
-    if (this._aba === 'faturas')   { el.innerHTML = this._htmlFaturas(mes,ano); }
-    if (this._aba === 'evolucao')  { el.innerHTML = this._htmlEvolucao(); setTimeout(()=>this._drawEvolucao(),50); }
-    if (this._aba === 'conquistas') { el.innerHTML = this._htmlConquistas(); }
+    if (this._aba === 'resumo')       { el.innerHTML = this._htmlResumo(mes,ano); setTimeout(()=>this._drawSaldoEvolucao(),50); }
+    if (this._aba === 'categoria')    { el.innerHTML = this._htmlCategorias(mes,ano); }
+    if (this._aba === 'faturas')      { el.innerHTML = this._htmlFaturas(mes,ano); }
+    if (this._aba === 'evolucao')     { el.innerHTML = this._htmlEvolucao(); setTimeout(()=>this._drawEvolucao(),50); }
+    if (this._aba === 'conquistas')   { el.innerHTML = this._htmlConquistas(); }
+    if (this._aba === 'assinaturas')  { el.innerHTML = this._htmlAssinaturas(); }
   },
   _htmlResumo(mes,ano) {
     const r = Fin.resumoMensal(mes,ano);
@@ -3339,6 +3430,28 @@ Telas.relatorios = {
   _drawEvolucao() {
     const dados = Fin.evolucao(6);
     Graf.barras('cv-barras', dados);
+  },
+  _htmlAssinaturas() {
+    const lista = Fin.detectarAssinaturas();
+    const totalMes = lista.reduce((a,s) => a + s.valorMedio, 0);
+    if (!lista.length) return `<div class="vazio"><div class="vazio-ico">🔁</div><p>Sem gastos recorrentes detectados ainda.<br>Registre pelo menos 2 meses para análise.</p></div>`;
+    return `
+      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--aviso)">
+        <div style="font-size:13px;color:var(--txt2)">Total detectado em assinaturas/recorrências</div>
+        <div style="font-size:24px;font-weight:800;color:var(--despesa)">${Utils.moeda(totalMes)}<span style="font-size:13px;font-weight:400">/mês</span></div>
+        <div style="font-size:12px;color:var(--txt2);margin-top:4px">${lista.length} cobranças recorrentes identificadas</div>
+      </div>
+      <div class="card">
+        ${lista.map(s => `
+          <div class="lista-item">
+            <div class="ico-cat" style="background:${s.cor+'22'}">${s.ico}</div>
+            <div class="lista-info">
+              <div class="lista-titulo">${Utils.esc(s.descricao)}</div>
+              <div class="lista-sub">Detectado em ${s.meses} meses · última: ${Utils.formatarData(s.ultimaData)}</div>
+            </div>
+            <div class="lista-valor" style="color:var(--despesa)">${Utils.moeda(s.valorMedio)}/mês</div>
+          </div>`).join('')}
+      </div>`;
   }
 };
 
