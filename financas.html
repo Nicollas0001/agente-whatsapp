@@ -372,6 +372,40 @@ canvas { display: block; }
 .chat-msg.app.ok  { border-left: 3px solid var(--receita); }
 .chat-msg.app.err { border-left: 3px solid var(--despesa); }
 
+/* ── TELA INVESTIMENTOS ──────────────────────────────── */
+.inv-hero {
+  background: linear-gradient(135deg,#0d2137 0%,#1a1a3e 60%,#0d1a2e 100%);
+  border:1px solid rgba(6,214,160,.35);border-radius:16px;padding:22px 20px 18px;
+  margin-bottom:14px;position:relative;overflow:hidden;
+}
+.inv-hero::before {
+  content:'';position:absolute;top:-40px;right:-40px;width:180px;height:180px;
+  background:radial-gradient(circle,rgba(6,214,160,.12) 0%,transparent 70%);border-radius:50%;pointer-events:none;
+}
+.inv-score {
+  position:absolute;top:14px;right:14px;background:rgba(108,99,255,.3);
+  border:1px solid rgba(108,99,255,.5);border-radius:20px;padding:3px 10px;
+  font-size:12px;font-weight:700;color:#b3aeff;
+}
+.inv-patrimonio { font-size:34px;font-weight:800;color:var(--receita);letter-spacing:-1px;line-height:1.1; }
+.inv-liberdade-bar { height:6px;background:var(--sup2);border-radius:4px;overflow:hidden;margin:10px 0 6px; }
+.inv-liberdade-fill { height:100%;background:linear-gradient(90deg,#06D6A0,#6C63FF);border-radius:4px;transition:width .5s; }
+.inv-perfume-card {
+  background:linear-gradient(135deg,rgba(255,100,180,.12) 0%,rgba(108,99,255,.08) 100%);
+  border:1px solid rgba(255,100,180,.3);border-radius:14px;padding:16px;
+}
+.inv-perfume-icon { font-size:32px;margin-bottom:6px; }
+.inv-meta-card { background:var(--sup);border:1px solid var(--borda);border-radius:14px;padding:16px; }
+.inv-milestones { display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px; }
+.inv-milestone { text-align:center;background:var(--sup2);border-radius:10px;padding:10px 4px; }
+.inv-milestone-ano { font-size:10px;color:var(--txt2);margin-bottom:3px; }
+.inv-milestone-val { font-size:12px;font-weight:700;color:var(--receita); }
+.inv-custo { background:rgba(239,71,111,.06);border:1px solid rgba(239,71,111,.25);border-radius:14px;padding:16px;margin-bottom:14px; }
+.inv-streak-grid { display:flex;gap:5px;flex-wrap:wrap;margin-top:10px; }
+.inv-streak-item { width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-direction:column; }
+.inv-streak-item.ok   { background:rgba(6,214,160,.15);border:1px solid rgba(6,214,160,.2); }
+.inv-streak-item.miss { background:rgba(239,71,111,.08);border:1px solid rgba(239,71,111,.15); }
+.inv-streak-item.zero { background:var(--sup2);border:1px solid var(--borda); }
 /* ── ALERTA INVESTIMENTO ──────────────────────────────── */
 .alerta-invest {
   border-radius: var(--raio-sm); padding: 12px 14px; margin-bottom: 14px;
@@ -582,6 +616,12 @@ const Storage = {
   salvarFixosLog(v)    { this.set('fixoslog', v); },
   metaInvest()         { return this.get('metainvest') ?? 500; },
   salvarMetaInvest(v)  { this.set('metainvest', v); },
+  perfumeMeta()        { return this.get('perfumemeta') ?? 210; },
+  salvarPerfumeMeta(v) { this.set('perfumemeta', v); },
+  patrimonioAlvo()     { return this.get('patralvo') ?? 100000; },
+  salvarPatrimonioAlvo(v){ this.set('patralvo', v); },
+  taxaInvest()         { return this.get('taxainvest') ?? 1.0; },
+  salvarTaxaInvest(v)  { this.set('taxainvest', v); },
   recompensas()        { return this.get('recompensas') || []; },
   salvarRecompensas(v) { this.set('recompensas', v); },
   notifConfig()        { return this.get('notifcfg') || { ativo: false, diasAntes: 3 }; },
@@ -705,7 +745,8 @@ const Sync = (function() {
 
 // Patch Storage: todo salvar* também envia para Firestore
 ['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
- 'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas'
+ 'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas',
+ 'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest'
 ].forEach(fn => {
   const orig = Storage[fn].bind(Storage);
   Storage[fn] = function(...args) { orig(...args); Sync.push(); };
@@ -1635,6 +1676,38 @@ const Fin = {
           atual: atualVal, media, diff: atualVal - media, temHistorico: (hist[c.id] || 0) > 0 };
       })
       .sort((a, b) => b.diff - a.diff);
+  },
+  patrimonioTotal() {
+    const aportes = Storage.investimentos().reduce((a,i) => a + i.valor, 0);
+    const saldosInvest = Storage.contas()
+      .filter(c => c.tipo === 'investimento')
+      .reduce((a,c) => a + this.saldoConta(c.id), 0);
+    return aportes + saldosInvest;
+  },
+  scoreInvestidor() {
+    const meta = Storage.metaInvest();
+    if (!meta) return 0;
+    const hoje = new Date();
+    let acertos = 0, total = 0;
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const m = d.getMonth() + 1, a = d.getFullYear();
+      const inv = Storage.investimentos()
+        .filter(x => Utils.datasNoMes(x.data, m, a))
+        .reduce((s,x) => s + x.valor, 0);
+      if (i === 0 && inv === 0) continue;
+      total++;
+      if (inv >= meta) acertos++;
+    }
+    return total === 0 ? 0 : Math.round((acertos / total) * 100);
+  },
+  mesesParaAlvo(patrimonioAtual, aporte, taxaMensal, alvo) {
+    let p = patrimonioAtual, n = 0;
+    while (p < alvo && n < 600) { p = p * (1 + taxaMensal) + aporte; n++; }
+    return n;
+  },
+  fvJurosCompostos(pmt, taxa, n, pvAtual) {
+    return pmt * ((Math.pow(1 + taxa, n) - 1) / taxa) + pvAtual * Math.pow(1 + taxa, n);
   }
 };
 
@@ -1958,6 +2031,76 @@ const Graf = {
       ctx.fillStyle = '#9A9ABF'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(dados[i].label, x, H - 6);
     }
+  },
+  linhaCompostos(canvasId, pvAtual, pmt, taxa, mesesAlvo) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.offsetWidth || c.width; c.width = W;
+    const H = 180; c.height = H;
+    ctx.clearRect(0, 0, W, H);
+    const padL = 52, padR = 12, padT = 16, padB = 28;
+    const cW = W - padL - padR, cH = H - padT - padB;
+    const totalMeses = 120;
+    const pts = [];
+    for (let n = 0; n <= totalMeses; n += 2) {
+      pts.push({ n, v: Fin.fvJurosCompostos(pmt, taxa, n, pvAtual) });
+    }
+    const maxV = pts[pts.length - 1].v;
+    const toX = n => padL + (n / totalMeses) * cW;
+    const toY = v => padT + cH - (v / maxV) * cH;
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + cH);
+    grad.addColorStop(0, 'rgba(6,214,160,0.25)');
+    grad.addColorStop(1, 'rgba(6,214,160,0.02)');
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(pvAtual));
+    pts.forEach(p => ctx.lineTo(toX(p.n), toY(p.v)));
+    ctx.lineTo(toX(totalMeses), padT + cH);
+    ctx.lineTo(toX(0), padT + cH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // Line
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(toX(p.n), toY(p.v)) : ctx.lineTo(toX(p.n), toY(p.v)));
+    ctx.strokeStyle = '#06D6A0';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    // Milestone markers
+    const fmt = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? Math.round(v/1e3)+'k' : Math.round(v);
+    [[12,'1a'],[24,'2a'],[60,'5a'],[120,'10a']].forEach(([n, label]) => {
+      const v = Fin.fvJurosCompostos(pmt, taxa, n, pvAtual);
+      const x = toX(n), y = toY(v);
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#06D6A0'; ctx.fill();
+      ctx.strokeStyle = '#0d2137'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#06D6A0';
+      ctx.fillText('R$'+fmt(v), x, y - 8);
+      ctx.fillStyle = 'rgba(154,154,191,0.8)';
+      ctx.fillText(label, x, H - 4);
+    });
+    // Freedom goal line
+    if (pvAtual < mesesAlvo * pmt) {
+      const yGoal = toY(Storage.patrimonioAlvo());
+      if (yGoal > padT && yGoal < padT + cH) {
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(padL, yGoal); ctx.lineTo(padL + cW, yGoal);
+        ctx.strokeStyle = 'rgba(255,209,102,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = '9px system-ui'; ctx.fillStyle = 'rgba(255,209,102,0.8)'; ctx.textAlign = 'left';
+        ctx.fillText('🏁 Meta', padL + 4, yGoal - 4);
+      }
+    }
+    // Y axis labels
+    ctx.font = '9px system-ui'; ctx.fillStyle = 'rgba(154,154,191,0.7)'; ctx.textAlign = 'right';
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+      const v = maxV * f, y = toY(v);
+      ctx.fillText('R$'+fmt(v), padL - 4, y + 3);
+      ctx.beginPath(); ctx.moveTo(padL - 2, y); ctx.lineTo(padL + cW, y);
+      ctx.strokeStyle = 'rgba(154,154,191,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke();
+    });
   },
   barrasEvolucao(canvasId, dados) {
     const c = document.getElementById(canvasId);
@@ -3203,70 +3346,198 @@ Telas.relatorios = {
    TELA: INVESTIMENTOS
 ═══════════════════════════════════════════════════════════ */
 Telas.investimentos = {
-  _ref: Utils.mesAtual(),
   render() {
-    const { mes, ano } = this._ref;
-    const meta = Storage.metaInvest();
-    const todos = Storage.investimentos();
-    const doMes = todos.filter(i => Utils.datasNoMes(i.data, mes, ano));
-    const total = doMes.reduce((a,i)=>a+i.valor, 0);
-    const pct   = meta ? Math.min(100, Math.round(total/meta*100)) : 0;
-    const cls   = pct >= 100 ? 'barra-ok' : pct >= 60 ? 'barra-med' : 'barra-alto';
+    const { mes, ano } = Utils.mesAtual();
+    const metaInv  = Storage.metaInvest();
+    const metaPerf = Storage.perfumeMeta();
+    const alvo     = Storage.patrimonioAlvo();
+    const taxa     = Storage.taxaInvest() / 100;
+
+    const patrimonio  = Fin.patrimonioTotal();
+    const score       = Fin.scoreInvestidor();
+    const doMes       = Storage.investimentos().filter(i => Utils.datasNoMes(i.data, mes, ano));
+    const investMes   = doMes.reduce((a,i) => a + i.valor, 0);
+    const pct         = metaInv ? Math.min(100, Math.round(investMes / metaInv * 100)) : 0;
+    const metaBatida  = investMes >= metaInv;
+    const mesesLib    = Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo);
+    const libPct      = Math.min(100, patrimonio > 0 ? Math.round(patrimonio / alvo * 100) : 0);
+    const dataLib     = (() => {
+      const d = new Date(); d.setMonth(d.getMonth() + mesesLib);
+      const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      return `${meses[d.getMonth()]}/${d.getFullYear()}`;
+    })();
+
+    const scoreClr = score >= 80 ? '#06D6A0' : score >= 50 ? '#FFD166' : '#EF476F';
+    const scoreLabel = score >= 80 ? '🏆 Excelente' : score >= 50 ? '⚡ Bom' : '🎯 Crescendo';
+
+    // Streak últimos 12 meses
+    const streak = [];
+    let consecAtual = 0;
+    for (let i = 11; i >= 0; i--) {
+      const ref = Utils.addMes(mes, ano, -i);
+      const v = Storage.investimentos().filter(x => Utils.datasNoMes(x.data, ref.mes, ref.ano)).reduce((s,x)=>s+x.valor,0);
+      const ok = v >= metaInv && v > 0;
+      const zero = v === 0;
+      const lbl = new Date(ref.ano, ref.mes-1, 1).toLocaleDateString('pt-BR',{month:'short'}).replace('.','');
+      if (ok) consecAtual++; else if (v > 0) consecAtual = 0;
+      streak.push({ lbl, v, ok, zero });
+    }
+    const consecFinal = (() => { let s=0; for(let i=streak.length-1;i>=0;i--){if(streak[i].ok)s++;else if(streak[i].v>0)break;} return s; })();
+
+    // Milestones FV
+    const fv = n => Math.round(Fin.fvJurosCompostos(metaInv, taxa, n, patrimonio));
+    const fmt = v => v >= 1e6 ? 'R$'+(v/1e6).toFixed(1)+'M' : 'R$'+Math.round(v/1e3)+'k';
+
+    // Custo de não investir (10 anos)
+    const custoNaoInvestir = fv(120) - metaInv * 120;
+
+    // Perfume status
+    const percRenda = metaInv > 0 ? Math.round((metaPerf / metaInv) * 100) : 0;
+
     const el = document.getElementById('tela-investimentos');
     el.innerHTML = `
-      <div class="sec-header">
-        <h1 class="sec-titulo">💹 Investimentos</h1>
-        <button class="btn btn-ghost btn-sm" onclick="Telas.investimentos._editarMeta()">Meta: ${Utils.moeda(meta)}</button>
-      </div>
-      <div class="mes-nav">
-        <button onclick="Telas.investimentos._mudarMes(-1)">◀</button>
-        <span class="mes-nome">${Utils.nomeMes(mes,ano)}</span>
-        <button onclick="Telas.investimentos._mudarMes(1)">▶</button>
-      </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="invest-nums">
-          <span>Investido: <strong style="color:var(--receita)">${Utils.moeda(total)}</strong></span>
-          <span>Meta: <strong>${Utils.moeda(meta)}</strong></span>
+      <div style="padding:0 0 80px">
+
+        <!-- ── HERO ── -->
+        <div class="inv-hero">
+          <div class="inv-score">${scoreLabel} · ${score}/100</div>
+          <div style="font-size:11px;color:rgba(154,154,191,.8);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Patrimônio acumulado</div>
+          <div class="inv-patrimonio">${Utils.moeda(patrimonio)}</div>
+          <div style="font-size:12px;color:var(--txt2);margin-top:4px">
+            ${investMes > 0 ? `<span style="color:var(--receita)">+${Utils.moeda(investMes)} este mês</span> · ` : ''}Meta: ${Utils.moeda(alvo)}
+          </div>
+          <div class="inv-liberdade-bar">
+            <div class="inv-liberdade-fill" style="width:${libPct}%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(154,154,191,.8)">
+            <span>${libPct}% da liberdade financeira</span>
+            <span onclick="Telas.investimentos._editarConfigs()" style="cursor:pointer;color:rgba(108,99,255,.9)">🏁 Meta: ${Utils.moeda(alvo)} ✏️</span>
+          </div>
+          ${mesesLib < 600 ? `<div style="margin-top:10px;font-size:12px;background:rgba(6,214,160,.08);border:1px solid rgba(6,214,160,.2);border-radius:8px;padding:8px 12px">
+            🗓️ Com R$${metaInv.toLocaleString('pt-BR')}/mês você chega lá em <strong style="color:var(--receita)">${mesesLib} meses</strong> — por volta de <strong style="color:var(--receita)">${dataLib}</strong>
+          </div>` : ''}
         </div>
-        <div class="barra-wrap"><div class="barra-fill ${cls}" style="width:${pct}%"></div></div>
-        <div style="font-size:12px;color:var(--txt2);margin-top:6px">
-          ${pct >= 100 ? '🎉 Meta atingida!' : `Falta <strong>${Utils.moeda(meta - total)}</strong> para atingir a meta`}
+
+        <!-- ── META + PERFUME ── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="inv-meta-card">
+            <div style="font-size:11px;color:var(--txt2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">💹 Meta do mês</div>
+            <div style="font-size:20px;font-weight:800;color:${pct>=100?'var(--receita)':'var(--txt)'}">${Utils.moeda(investMes)}</div>
+            <div style="font-size:11px;color:var(--txt2);margin:4px 0 8px">de ${Utils.moeda(metaInv)}</div>
+            <div style="background:var(--sup2);border-radius:4px;height:6px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${pct>=100?'var(--receita)':pct>=60?'var(--aviso)':'var(--despesa)'};border-radius:4px;transition:width .5s"></div>
+            </div>
+            <div style="font-size:11px;margin-top:6px;color:${pct>=100?'var(--receita)':'var(--txt2)'}">
+              ${pct>=100?'🎉 Meta atingida!':`Falta ${Utils.moeda(metaInv-investMes)}`}
+            </div>
+          </div>
+          <div class="inv-perfume-card">
+            <div class="inv-perfume-icon">${metaBatida?'🌹':'🔒'}</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px">${Utils.moeda(metaPerf)}/mês</div>
+            <div style="font-size:11px;color:${metaBatida?'var(--receita)':'var(--txt2)'}">
+              ${metaBatida ? '<strong style="color:var(--receita)">Perfume garantido!</strong><br>Você merece 🎁' : `Invista mais<br><strong>${Utils.moeda(metaInv-investMes)}</strong> para ganhar`}
+            </div>
+            <div style="font-size:10px;color:var(--txt2);margin-top:6px">= ${percRenda}% do seu aporte</div>
+          </div>
         </div>
-      </div>
-      <div class="sec-header" style="margin-bottom:12px">
-        <h2 style="font-size:15px;font-weight:700">Lançamentos</h2>
-        <button class="btn btn-prim btn-sm" onclick="Telas.investimentos._novoManual()">+ Adicionar</button>
-      </div>
-      ${doMes.length ? `<div class="card">
-        ${doMes.sort((a,b)=>b.data.localeCompare(a.data)).map(i=>`
-          <div class="lista-item">
-            <div class="ico-cat" style="background:rgba(6,214,160,.15)">📈</div>
-            <div class="lista-info">
-              <div class="lista-titulo">${Utils.esc(i.descricao)}</div>
-              <div class="lista-sub">${Utils.formatarData(i.data)}</div>
-            </div>
-            <div class="lista-valor" style="color:var(--receita)">${Utils.moeda(i.valor)}</div>
-            <div class="lista-acoes">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.investimentos._excluir('${i.id}')">🗑️</button>
-            </div>
-          </div>`).join('')}
-      </div>` : `<div class="vazio"><div class="vazio-ico">📈</div><p>Nenhum investimento registrado.<br>Use o chat ou o botão "+" para adicionar.</p></div>`}`;
+
+        <!-- ── SIMULADOR ── -->
+        <div class="card" style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <h2 style="font-size:14px;font-weight:700">📈 Seu dinheiro no futuro</h2>
+            <span onclick="Telas.investimentos._editarConfigs()" style="font-size:11px;color:rgba(108,99,255,.9);cursor:pointer">${(taxa*100).toFixed(1)}% a.m. ✏️</span>
+          </div>
+          <div style="font-size:12px;color:var(--txt2);margin-bottom:12px">Investindo <strong>${Utils.moeda(metaInv)}/mês</strong> com juros compostos de <strong>${(taxa*100).toFixed(1)}% a.m.</strong></div>
+          <canvas id="cv-compostos" style="width:100%;border-radius:8px"></canvas>
+          <div class="inv-milestones">
+            ${[[12,'1 ano'],[24,'2 anos'],[60,'5 anos'],[120,'10 anos']].map(([n,l])=>`
+              <div class="inv-milestone">
+                <div class="inv-milestone-ano">${l}</div>
+                <div class="inv-milestone-val">${fmt(fv(n))}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- ── CUSTO DE NÃO INVESTIR ── -->
+        <div class="inv-custo">
+          <div style="font-size:13px;font-weight:700;margin-bottom:6px">💸 O custo de não investir</div>
+          <div style="font-size:12px;color:var(--txt2);line-height:1.5">
+            Se você <em>gastar</em> R$${metaInv.toLocaleString('pt-BR')} este mês em vez de investir, em 10 anos você perde
+            <strong style="color:var(--despesa);font-size:14px"> ${fmt(custoNaoInvestir)}</strong> em juros compostos.
+          </div>
+          <div style="font-size:11px;color:var(--txt2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(239,71,111,.15)">
+            Cada R$1 poupado hoje vira <strong style="color:var(--receita)">R$${(Math.pow(1+taxa,120)).toFixed(2)}</strong> em 10 anos.
+          </div>
+        </div>
+
+        <!-- ── STREAK ── -->
+        <div class="card" style="margin:14px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h2 style="font-size:14px;font-weight:700">🔥 Sequência de aportes</h2>
+            ${consecFinal > 0 ? `<span style="background:rgba(6,214,160,.15);border:1px solid rgba(6,214,160,.2);border-radius:12px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--receita)">${consecFinal} mês${consecFinal>1?'es':''} seguido${consecFinal>1?'s':''} 🔥</span>` : ''}
+          </div>
+          <div class="inv-streak-grid">
+            ${streak.map(s=>`
+              <div class="inv-streak-item ${s.zero?'zero':s.ok?'ok':'miss'}" title="${s.lbl}: ${s.v>0?Utils.moeda(s.v):'sem aporte'}">
+                <span style="font-size:10px">${s.ok?'✅':s.zero?'○':'✗'}</span>
+                <span style="font-size:9px;color:var(--txt2)">${s.lbl}</span>
+              </div>`).join('')}
+          </div>
+          ${consecFinal === 0 && streak.every(s=>s.zero) ? `<div style="font-size:12px;color:var(--txt2);margin-top:8px;text-align:center">Registre seu primeiro aporte para começar a sequência 💪</div>` : ''}
+        </div>
+
+        <!-- ── APORTES RECENTES ── -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h2 style="font-size:14px;font-weight:700">Aportes registrados</h2>
+          <button class="btn btn-prim btn-sm" onclick="Telas.investimentos._novoManual()">+ Registrar</button>
+        </div>
+        ${Storage.investimentos().length ? `<div class="card">
+          ${Storage.investimentos().sort((a,b)=>b.data.localeCompare(a.data)).slice(0,10).map(i=>`
+            <div class="lista-item">
+              <div class="ico-cat" style="background:rgba(6,214,160,.12)">📈</div>
+              <div class="lista-info">
+                <div class="lista-titulo">${Utils.esc(i.descricao)}</div>
+                <div class="lista-sub">${Utils.formatarData(i.data)}</div>
+              </div>
+              <div class="lista-valor" style="color:var(--receita)">${Utils.moeda(i.valor)}</div>
+              <div class="lista-acoes">
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="Telas.investimentos._excluir('${i.id}')">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>` : `<div class="vazio"><div class="vazio-ico">📈</div>
+          <p>Nenhum aporte registrado ainda.<br>Diga no chat: <em>"investi 900 hoje"</em></p></div>`}
+
+      </div>`;
+
+    setTimeout(() => Graf.linhaCompostos('cv-compostos', patrimonio, metaInv, taxa, mesesLib), 60);
   },
-  _mudarMes(d) { this._ref = Utils.addMes(this._ref.mes, this._ref.ano, d); this.render(); },
-  _editarMeta() {
-    const meta = Storage.metaInvest();
-    Modal.abrir('Meta de Investimento', `
-      <div class="form-grupo"><label>Meta mensal (R$)</label>
-        <input id="meta-val" type="number" step="50" min="0" value="${meta}">
-        <div style="font-size:12px;color:var(--txt2);margin-top:6px">Você será alertado quando os gastos ameaçarem essa meta.</div>
+
+  _editarConfigs() {
+    const metaInv = Storage.metaInvest();
+    const metaPerf = Storage.perfumeMeta();
+    const alvo = Storage.patrimonioAlvo();
+    const taxa = Storage.taxaInvest();
+    Modal.abrir('⚙️ Configurações de Investimento', `
+      <div class="form-grupo"><label>Meta de aporte mensal (R$)</label>
+        <input id="ci-meta" type="number" step="50" min="0" value="${metaInv}"></div>
+      <div class="form-grupo"><label>🌹 Meta do perfume/recompensa (R$)</label>
+        <input id="ci-perf" type="number" step="10" min="0" value="${metaPerf}"></div>
+      <div class="form-grupo"><label>🏁 Patrimônio alvo para liberdade (R$)</label>
+        <input id="ci-alvo" type="number" step="1000" min="1000" value="${alvo}"></div>
+      <div class="form-grupo"><label>📈 Rendimento mensal estimado (%)</label>
+        <input id="ci-taxa" type="number" step="0.1" min="0.1" max="5" value="${taxa}">
+        <div style="font-size:11px;color:var(--txt2);margin-top:4px">Poupança ~0.7% · CDB/Selic ~1% · Renda variável ~1.5%</div>
       </div>`, { onOk: () => {
-        const v = parseFloat(document.getElementById('meta-val').value) || 0;
-        Storage.salvarMetaInvest(v);
-        Modal.fechar(); this.render(); toast('Meta atualizada!');
+        Storage.salvarMetaInvest(parseFloat(document.getElementById('ci-meta').value)||900);
+        Storage.salvarPerfumeMeta(parseFloat(document.getElementById('ci-perf').value)||210);
+        Storage.salvarPatrimonioAlvo(parseFloat(document.getElementById('ci-alvo').value)||100000);
+        Storage.salvarTaxaInvest(parseFloat(document.getElementById('ci-taxa').value)||1.0);
+        Modal.fechar(); this.render(); Utils.toast('Configurações salvas!');
     }});
   },
+
   _novoManual() {
-    Modal.abrir('Novo Investimento', `
+    Modal.abrir('Registrar Aporte', `
       <div class="form-row">
         <div class="form-grupo"><label>Data</label><input id="inv-data" type="date" value="${Utils.dataHoje()}"></div>
         <div class="form-grupo"><label>Valor (R$)</label>
@@ -3274,7 +3545,7 @@ Telas.investimentos = {
           <div class="form-erro" id="inv-err">Informe o valor</div></div>
       </div>
       <div class="form-grupo"><label>Descrição</label>
-        <input id="inv-desc" type="text" placeholder="Ex: Poupança, Tesouro Direto..." value="Investimento">
+        <input id="inv-desc" type="text" placeholder="Ex: CDB, Tesouro Direto, Poupança…" value="Investimento">
       </div>`, { onOk: () => {
         const valor = parseFloat(document.getElementById('inv-val').value) || 0;
         if (!valor) { document.getElementById('inv-err').classList.add('vis'); return; }
@@ -3282,13 +3553,14 @@ Telas.investimentos = {
         arr.push({ id: Utils.uuid(), data: document.getElementById('inv-data').value || Utils.dataHoje(),
           descricao: document.getElementById('inv-desc').value.trim() || 'Investimento', valor });
         Storage.salvarInvestimentos(arr);
-        Modal.fechar(); this.render(); toast('Investimento registrado!');
+        Modal.fechar(); this.render(); Utils.toast('Aporte registrado! 💹');
     }});
   },
+
   _excluir(id) {
-    Modal.confirmar('Excluir este investimento?', () => {
-      Storage.salvarInvestimentos(Storage.investimentos().filter(i=>i.id!==id));
-      this.render(); toast('Excluído.');
+    Modal.confirmar('Excluir este aporte?', () => {
+      Storage.salvarInvestimentos(Storage.investimentos().filter(i => i.id !== id));
+      this.render(); Utils.toast('Excluído.');
     });
   }
 };
