@@ -669,6 +669,10 @@ const Storage = {
   salvarMetaInvest(v)  { this.set('metainvest', v); },
   perfumeMeta()        { return this.get('perfumemeta') ?? 210; },
   salvarPerfumeMeta(v) { this.set('perfumemeta', v); },
+  recompNome()         { return this.get('recompnome') ?? 'Perfume'; },
+  salvarRecompNome(v)  { this.set('recompnome', v); },
+  recompEmoji()        { return this.get('recompemoji') ?? '🌹'; },
+  salvarRecompEmoji(v) { this.set('recompemoji', v); },
   patrimonioAlvo()     {
     // modo automático (padrão): número da liberdade = gasto mensal ÷ rendimento mensal
     if (this.get('alvoauto') !== false && typeof Fin !== 'undefined') return Fin.numeroLiberdade();
@@ -803,7 +807,7 @@ const Sync = (function() {
 // Patch Storage: todo salvar* também envia para Firestore
 ['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
  'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas',
- 'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto'
+ 'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto','salvarRecompNome','salvarRecompEmoji'
 ].forEach(fn => {
   const orig = Storage[fn].bind(Storage);
   Storage[fn] = function(...args) { orig(...args); Sync.push(); };
@@ -3635,10 +3639,12 @@ Telas.relatorios = {
 Telas.investimentos = {
   render() {
     const { mes, ano } = Utils.mesAtual();
-    const metaInv  = Storage.metaInvest();
-    const metaPerf = Storage.perfumeMeta();
-    const alvo     = Storage.patrimonioAlvo();
-    const taxa     = Storage.taxaInvest() / 100;
+    const metaInv   = Storage.metaInvest();
+    const metaPerf  = Storage.perfumeMeta();
+    const recompNome  = Storage.recompNome();
+    const recompEmoji = Storage.recompEmoji();
+    const alvo      = Storage.patrimonioAlvo();
+    const taxa      = Storage.taxaInvest() / 100;
 
     const patrimonio  = Fin.patrimonioTotal();
     const score       = Fin.scoreInvestidor();
@@ -3718,13 +3724,15 @@ Telas.investimentos = {
               ${pct>=100?'🎉 Meta atingida!':`Falta ${Utils.moeda(metaInv-investMes)}`}
             </div>
           </div>
-          <div class="inv-perfume-card">
-            <div class="inv-perfume-icon">${metaBatida?'🌹':'🔒'}</div>
-            <div style="font-size:13px;font-weight:700;margin-bottom:4px">${Utils.moeda(metaPerf)}/mês</div>
+          <div class="inv-perfume-card" onclick="Telas.investimentos._editarConfigs()" style="cursor:pointer">
+            <div class="inv-perfume-icon">${metaBatida ? recompEmoji : '🔒'}</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px">${Utils.esc(recompNome)} · ${Utils.moeda(metaPerf)}/mês</div>
             <div style="font-size:11px;color:${metaBatida?'var(--receita)':'var(--txt2)'}">
-              ${metaBatida ? '<strong style="color:var(--receita)">Perfume garantido!</strong><br>Você merece 🎁' : `Invista mais<br><strong>${Utils.moeda(metaInv-investMes)}</strong> para ganhar`}
+              ${metaBatida
+                ? `<strong style="color:var(--receita)">${Utils.esc(recompNome)} garantido!</strong><br>Você merece 🎁`
+                : `Invista mais <strong>${Utils.moeda(metaInv - investMes)}</strong> para ganhar`}
             </div>
-            <div style="font-size:10px;color:var(--txt2);margin-top:6px">= ${percRenda}% do seu aporte</div>
+            <div style="font-size:10px;color:var(--txt2);margin-top:6px">= ${percRenda}% do seu aporte · ✏️ editar</div>
           </div>
         </div>
 
@@ -3800,8 +3808,10 @@ Telas.investimentos = {
   },
 
   _editarConfigs() {
-    const metaInv = Storage.metaInvest();
-    const metaPerf = Storage.perfumeMeta();
+    const metaInv    = Storage.metaInvest();
+    const metaPerf   = Storage.perfumeMeta();
+    const recompNome  = Storage.recompNome();
+    const recompEmoji = Storage.recompEmoji();
     const auto = Storage.alvoAuto();
     const alvoManual = Storage.get('patralvo') ?? 100000;
     const taxa = Storage.taxaInvest();
@@ -3810,7 +3820,15 @@ Telas.investimentos = {
     Modal.abrir('⚙️ Configurações de Investimento', `
       <div class="form-grupo"><label>Meta de aporte mensal (R$)</label>
         <input id="ci-meta" type="number" step="50" min="0" value="${metaInv}"></div>
-      <div class="form-grupo"><label>🌹 Meta do perfume/recompensa (R$)</label>
+      <div class="form-grupo">
+        <label>🎁 Recompensa mensal</label>
+        <div style="display:flex;gap:8px">
+          <input id="ci-recomp-emoji" type="text" style="width:56px;text-align:center;font-size:20px" maxlength="2" value="${Utils.esc(recompEmoji)}" placeholder="🎁">
+          <input id="ci-recomp-nome" type="text" style="flex:1" placeholder="Ex: Perfume, Tênis, Cinema…" value="${Utils.esc(recompNome)}">
+        </div>
+        <div style="font-size:11px;color:var(--txt2);margin-top:4px">Aparece destravado quando você bate a meta mensal</div>
+      </div>
+      <div class="form-grupo"><label>💰 Valor da recompensa (R$)</label>
         <input id="ci-perf" type="number" step="10" min="0" value="${metaPerf}"></div>
       <div class="form-grupo" style="background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.25);border-radius:10px;padding:12px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
@@ -3834,6 +3852,8 @@ Telas.investimentos = {
       </div>`, { onOk: () => {
         Storage.salvarMetaInvest(parseFloat(document.getElementById('ci-meta').value)||900);
         Storage.salvarPerfumeMeta(parseFloat(document.getElementById('ci-perf').value)||210);
+        Storage.salvarRecompNome(document.getElementById('ci-recomp-nome').value.trim() || 'Recompensa');
+        Storage.salvarRecompEmoji(document.getElementById('ci-recomp-emoji').value.trim() || '🎁');
         const ehAuto = document.getElementById('ci-auto').checked;
         Storage.salvarAlvoAuto(ehAuto);
         if (!ehAuto) Storage.salvarPatrimonioAlvo(parseFloat(document.getElementById('ci-alvo').value)||100000);
