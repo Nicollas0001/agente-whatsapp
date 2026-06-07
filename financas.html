@@ -3296,16 +3296,8 @@ Telas.dashboard = {
 
     const patrimonio = Fin.patrimonioTotal();
     const score      = Fin.scoreInvestidor();
-    const alvo       = Storage.patrimonioAlvo();
     const metaInv    = Storage.metaInvest();
     const taxa       = Storage.taxaInvest() / 100;
-    const libPct     = Math.min(100, patrimonio > 0 ? Math.round(patrimonio / alvo * 100) : 0);
-    const mesesLib   = Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo);
-    const dataLib    = (() => {
-      const d = new Date(); d.setMonth(d.getMonth() + mesesLib);
-      const m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-      return `${m[d.getMonth()]}/${d.getFullYear()}`;
-    })();
 
     // sequência de meses batendo a meta de aporte
     const { mes, ano } = Utils.mesAtual();
@@ -3316,11 +3308,56 @@ Telas.dashboard = {
         .filter(x => Utils.datasNoMes(x.data, ref.mes, ref.ano))
         .reduce((s,x) => s + x.valor, 0);
       if (v >= metaInv && v > 0) streak++;
-      else if (i === 0) continue; // mês atual ainda em andamento não quebra
+      else if (i === 0) continue;
       else break;
     }
 
     const scoreClr = score >= 80 ? '#06D6A0' : score >= 50 ? '#FFD166' : '#EF476F';
+
+    // ── objetivo de compra ativo (primeiro da lista) ──────────
+    const objs   = Storage.objCompras();
+    const objAtivo = objs[0] ?? null;
+    let barPct, barLabel, barSub, ctaLabel, ctaAction, stat2Lbl, stat2Val, stat2Clr;
+
+    if (objAtivo) {
+      const base      = objAtivo.patrimonioInicial ?? 0;
+      const investido = Math.max(0, patrimonio - base);
+      const pct       = Math.min(100, patrimonio > base ? Math.round(investido / objAtivo.alvo * 100) : 0);
+      const atingido  = investido >= objAtivo.alvo;
+      const falta     = Math.max(0, objAtivo.alvo - investido);
+      const mesesFalta = taxa > 0 && metaInv > 0 ? Fin.mesesParaAlvo(investido, metaInv, taxa, objAtivo.alvo) : null;
+
+      barPct    = pct;
+      stat2Lbl  = Utils.esc(objAtivo.emoji + ' ' + objAtivo.nome);
+      stat2Val  = atingido ? '🎉 Pronto!' : `${pct}%`;
+      stat2Clr  = atingido ? 'var(--receita)' : pct > 60 ? 'var(--aviso)' : 'var(--txt)';
+      barLabel  = atingido
+        ? `🎉 ${Utils.esc(objAtivo.emoji)} ${Utils.esc(objAtivo.nome)} — pode comprar!`
+        : `${Utils.esc(objAtivo.emoji)} ${Utils.esc(objAtivo.nome)} · falta ${Utils.moeda(falta)}${mesesFalta && mesesFalta < 600 ? ` (~${mesesFalta} meses)` : ''}`;
+      barSub    = atingido ? '' : `Investido: ${Utils.moeda(investido)} de ${Utils.moeda(objAtivo.alvo)}`;
+      ctaLabel  = atingido ? `${objAtivo.emoji} Ver objetivo` : '🎯 Meu objetivo';
+      ctaAction = "location.hash='investimentos'";
+    } else {
+      // sem objetivo: mostra liberdade
+      const alvo   = Storage.patrimonioAlvo();
+      const libPct = Math.min(100, patrimonio > 0 ? Math.round(patrimonio / alvo * 100) : 0);
+      const mesesLib = Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo);
+      const dataLib  = (() => {
+        const d = new Date(); d.setMonth(d.getMonth() + mesesLib);
+        const m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        return `${m[d.getMonth()]}/${d.getFullYear()}`;
+      })();
+      barPct    = libPct;
+      stat2Lbl  = 'Liberdade';
+      stat2Val  = `${libPct}%`;
+      stat2Clr  = 'var(--txt)';
+      barLabel  = mesesLib < 600
+        ? `🏁 Liberdade prevista: <strong style="color:#fff">${dataLib}</strong> · faltam ${mesesLib} meses`
+        : '🏁 Adicione um objetivo de compra para começar';
+      barSub    = '';
+      ctaLabel  = '🎯 Criar objetivo';
+      ctaAction = "location.hash='investimentos'";
+    }
 
     return `
       <div class="home-hero">
@@ -3336,24 +3373,22 @@ Telas.dashboard = {
         </div>
         <div class="hh-stats">
           <div class="hh-stat">
-            <div class="hh-stat-lbl">Patrimônio</div>
-            <div class="hh-stat-val" style="color:var(--receita)">${Utils.moeda(patrimonio)}</div>
+            <div class="hh-stat-lbl">Investido</div>
+            <div class="hh-stat-val" style="color:var(--receita);font-size:13px">${Utils.moeda(patrimonio)}</div>
           </div>
           <div class="hh-stat">
-            <div class="hh-stat-lbl">Liberdade</div>
-            <div class="hh-stat-val">${libPct}%</div>
+            <div class="hh-stat-lbl" style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${stat2Lbl}</div>
+            <div class="hh-stat-val" style="color:${stat2Clr}">${stat2Val}</div>
           </div>
           <div class="hh-stat">
             <div class="hh-stat-lbl">Sequência</div>
             <div class="hh-stat-val">${streak > 0 ? `🔥 ${streak}` : '—'}</div>
           </div>
         </div>
-        <div class="hh-bar"><div class="hh-bar-fill" style="width:${libPct}%"></div></div>
+        <div class="hh-bar"><div class="hh-bar-fill" style="width:${barPct}%"></div></div>
         <div class="hh-foot">
-          <span class="hh-liberdade">${mesesLib < 600
-            ? `🏁 Liberdade prevista: <strong style="color:#fff">${dataLib}</strong> · faltam ${mesesLib} meses`
-            : '🏁 Comece a investir para projetar sua liberdade'}</span>
-          <button class="hh-cta" onclick="location.hash='investimentos'">💎 Investir agora</button>
+          <span class="hh-liberdade">${barLabel}${barSub ? `<br><span style="font-size:10px;opacity:.7">${barSub}</span>` : ''}</span>
+          <button class="hh-cta" onclick="${ctaAction}">${ctaLabel}</button>
         </div>
       </div>`;
   },
