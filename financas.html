@@ -457,6 +457,38 @@ canvas { display: block; }
   padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
   box-shadow: 0 4px 14px rgba(6,214,160,.3); transition: transform .15s; }
 .hh-cta:active { transform: scale(.96); }
+/* ── OBJETIVOS DE COMPRA ──────────────────────────────── */
+.obj-card {
+  background: linear-gradient(135deg,rgba(108,99,255,.13) 0%,rgba(6,214,160,.07) 100%);
+  border: 1px solid rgba(108,99,255,.3); border-radius: 14px; padding: 16px; margin-bottom: 10px;
+}
+.obj-card.atingido {
+  border-color: rgba(6,214,160,.55);
+  background: linear-gradient(135deg,rgba(6,214,160,.15) 0%,rgba(108,99,255,.09) 100%);
+  box-shadow: 0 0 20px rgba(6,214,160,.12);
+}
+.obj-emoji { font-size: 32px; line-height: 1; }
+.obj-barra-wrap { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; margin: 10px 0 5px; }
+.obj-barra-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+.obj-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+/* ── COFRE SECRETO ─────────────────────────────────────── */
+.cofre-wrap { margin-top: 24px; }
+.cofre-toggle {
+  width: 100%; background: rgba(255,255,255,.03); border: 1px dashed rgba(255,255,255,.1);
+  border-radius: 12px; padding: 11px 16px; color: var(--txt2); font-size: 12px; cursor: pointer;
+  text-align: left; display: flex; align-items: center; gap: 8px; font-family: var(--fonte);
+  transition: background .2s;
+}
+.cofre-toggle:hover { background: rgba(255,255,255,.06); }
+.cofre-body { margin-top: 8px; }
+.cofre-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; background: rgba(0,0,0,.22); border-radius: 9px; margin-bottom: 6px;
+  border: 1px solid rgba(255,255,255,.05); font-size: 12px;
+}
+.cofre-item-nome { display: flex; align-items: center; gap: 7px; }
+.blur-val { filter: blur(6px); user-select: none; transition: filter .35s; cursor: pointer; font-weight: 700; color: var(--receita); }
+.blur-val.rev { filter: none; }
 /* ── ALERTA INVESTIMENTO ──────────────────────────────── */
 .alerta-invest {
   border-radius: var(--raio-sm); padding: 12px 14px; margin-bottom: 14px;
@@ -673,6 +705,10 @@ const Storage = {
   salvarRecompNome(v)  { this.set('recompnome', v); },
   recompEmoji()        { return this.get('recompemoji') ?? '🌹'; },
   salvarRecompEmoji(v) { this.set('recompemoji', v); },
+  objCompras()         { return this.get('objcompras') || []; },
+  salvarObjCompras(v)  { this.set('objcompras', v); },
+  objCofre()           { return this.get('objcofre') || []; },
+  salvarObjCofre(v)    { this.set('objcofre', v); },
   patrimonioAlvo()     {
     // modo automático (padrão): número da liberdade = gasto mensal ÷ rendimento mensal
     if (this.get('alvoauto') !== false && typeof Fin !== 'undefined') return Fin.numeroLiberdade();
@@ -807,7 +843,8 @@ const Sync = (function() {
 // Patch Storage: todo salvar* também envia para Firestore
 ['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
  'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas',
- 'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto','salvarRecompNome','salvarRecompEmoji'
+ 'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto','salvarRecompNome','salvarRecompEmoji',
+ 'salvarObjCompras','salvarObjCofre'
 ].forEach(fn => {
   const orig = Storage[fn].bind(Storage);
   Storage[fn] = function(...args) { orig(...args); Sync.push(); };
@@ -3781,6 +3818,9 @@ Telas.investimentos = {
           ${consecFinal === 0 && streak.every(s=>s.zero) ? `<div style="font-size:12px;color:var(--txt2);margin-top:8px;text-align:center">Registre seu primeiro aporte para começar a sequência 💪</div>` : ''}
         </div>
 
+        <!-- ── OBJETIVOS DE COMPRA ── -->
+        ${this._htmlObjetivos(patrimonio, metaInv, taxa)}
+
         <!-- ── APORTES RECENTES ── -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <h2 style="font-size:14px;font-weight:700">Aportes registrados</h2>
@@ -3801,6 +3841,8 @@ Telas.investimentos = {
             </div>`).join('')}
         </div>` : `<div class="vazio"><div class="vazio-ico">📈</div>
           <p>Nenhum aporte registrado ainda.<br>Diga no chat: <em>"investi 900 hoje"</em></p></div>`}
+
+        ${this._htmlCofre()}
 
       </div>`;
 
@@ -3888,7 +3930,158 @@ Telas.investimentos = {
       Storage.salvarInvestimentos(Storage.investimentos().filter(i => i.id !== id));
       this.render(); Utils.toast('Excluído.');
     });
-  }
+  },
+
+  // ── OBJETIVOS DE COMPRA ──────────────────────────────────
+  _htmlObjetivos(patrimonio, metaInv, taxa) {
+    const objs = Storage.objCompras();
+    const cards = objs.map(obj => {
+      const pct = patrimonio > 0 ? Math.min(100, Math.round(patrimonio / obj.alvo * 100)) : 0;
+      const atingido = patrimonio >= obj.alvo;
+      const falta = Math.max(0, obj.alvo - patrimonio);
+      const mesesFalta = taxa > 0 && metaInv > 0 ? Fin.mesesParaAlvo(patrimonio, metaInv, taxa, obj.alvo) : null;
+      const barClr = atingido ? 'var(--receita)' : pct > 60 ? 'var(--aviso)' : 'var(--prim)';
+      return `<div class="obj-card ${atingido ? 'atingido' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="obj-emoji">${Utils.esc(obj.emoji)}</span>
+            <div>
+              <div style="font-size:14px;font-weight:700">${Utils.esc(obj.nome)}</div>
+              <div style="font-size:11px;color:var(--txt2)">Custa ${Utils.moeda(obj.valor)} · Precisa investir ${Utils.moeda(obj.alvo)}</div>
+            </div>
+          </div>
+          ${!atingido ? `<button class="btn btn-ghost btn-sm btn-icon" style="flex-shrink:0" onclick="Telas.investimentos._excluirObj('${obj.id}')">🗑️</button>` : ''}
+        </div>
+        <div class="obj-barra-wrap">
+          <div class="obj-barra-fill" style="width:${pct}%;background:${barClr}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--txt2)">
+          <span style="color:${atingido ? 'var(--receita)' : 'var(--txt2)'}">
+            ${atingido ? '🎉 Objetivo atingido!' : `${pct}% · falta ${Utils.moeda(falta)}`}
+          </span>
+          <span>${!atingido && mesesFalta && mesesFalta < 600 ? `~${mesesFalta} meses` : atingido ? Utils.moeda(patrimonio) + ' investidos' : ''}</span>
+        </div>
+        ${atingido ? `
+          <div style="background:rgba(6,214,160,.1);border:1px solid rgba(6,214,160,.3);border-radius:10px;padding:12px;margin-top:12px">
+            <div style="font-size:12px;color:var(--receita);font-weight:700;margin-bottom:10px">
+              Você já tem ${Utils.moeda(patrimonio)} investidos — pode comprar com segurança!
+            </div>
+            <div class="obj-acoes">
+              <button class="btn btn-prim btn-sm" onclick="Telas.investimentos._comprar('${obj.id}')">🛍️ Vou comprar!</button>
+              <button class="btn btn-ghost btn-sm" onclick="Telas.investimentos._guardarCofre('${obj.id}')">🔐 Não quero mais — guardar</button>
+            </div>
+          </div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h2 style="font-size:14px;font-weight:700">🎯 Objetivos de Compra</h2>
+        <button class="btn btn-prim btn-sm" onclick="Telas.investimentos._novoObjetivo()">+ Novo</button>
+      </div>
+      ${objs.length ? cards : `<div class="vazio" style="padding:16px 0">
+        <div class="vazio-ico">🎯</div>
+        <p>Nenhum objetivo ainda.<br>Toque em <strong>+ Novo</strong> para adicionar o que você quer comprar.</p>
+      </div>`}`;
+  },
+
+  _htmlCofre() {
+    const cofre = Storage.objCofre();
+    if (!cofre.length) return '';
+    const n = cofre.length;
+    return `<div class="cofre-wrap">
+      <button class="cofre-toggle" id="cofre-btn"
+        onclick="const b=document.getElementById('cofre-body');const vis=b.style.display!=='none';b.style.display=vis?'none':'block';document.getElementById('cofre-btn').innerHTML=vis?'🔐 &nbsp;Ver cofre secreto (${n} ${n===1?'item':'itens'})':'🔒 &nbsp;Fechar cofre'">
+        🔐 &nbsp;Ver cofre secreto (${n} ${n===1?'item guardado':'itens guardados'})
+      </button>
+      <div class="cofre-body" id="cofre-body" style="display:none">
+        <div style="font-size:11px;color:var(--txt2);padding:8px 2px 10px;font-style:italic;line-height:1.55">
+          Itens que você decidiu não comprar. O valor já está no seu patrimônio.<br>
+          Toque no valor para revelar. 👇
+        </div>
+        ${cofre.map(o => `
+          <div class="cofre-item">
+            <div class="cofre-item-nome">
+              <span style="font-size:20px">${Utils.esc(o.emoji)}</span>
+              <div>
+                <div style="font-weight:600">${Utils.esc(o.nome)}</div>
+                <div style="font-size:10px;color:var(--txt2)">guardado em ${Utils.formatarData(o.arquivadoEm)}</div>
+              </div>
+            </div>
+            <span class="blur-val" title="toque para revelar" onclick="this.classList.toggle('rev')">${Utils.moeda(o.alvo)}</span>
+          </div>`).join('')}
+        <div style="font-size:10px;color:var(--txt2);padding:4px 2px;font-style:italic">
+          💪 Cada item que você resistiu virou patrimônio real.
+        </div>
+      </div>
+    </div>`;
+  },
+
+  _novoObjetivo() {
+    Modal.abrir('🎯 Novo Objetivo de Compra', `
+      <div style="background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.25);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--txt2);margin-bottom:14px;line-height:1.6">
+        Regra das <strong style="color:var(--prim)">10×</strong>: para comprar, você precisa ter
+        <strong style="color:var(--prim)">10 vezes o valor</strong> do item investido.<br>
+        Assim o dinheiro trabalha por você antes de sair do bolso.
+      </div>
+      <div class="form-row">
+        <div class="form-grupo" style="width:64px">
+          <label>Emoji</label>
+          <input id="obj-emoji" type="text" style="text-align:center;font-size:22px;padding:6px 4px" maxlength="2" placeholder="🎁" value="🎁">
+        </div>
+        <div class="form-grupo" style="flex:1">
+          <label>O que quer comprar?</label>
+          <input id="obj-nome" type="text" placeholder="Ex: Perfume Dior, Tênis Nike…">
+        </div>
+      </div>
+      <div class="form-grupo">
+        <label>Valor do item (R$)</label>
+        <input id="obj-valor" type="number" step="0.01" min="1" placeholder="200,00"
+          oninput="const v=parseFloat(this.value)||0;const el=document.getElementById('obj-preview');el.textContent=v?'Meta de investimento: '+v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+' × 10 = '+((v*10)).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'';el.style.display=v?'':'none'">
+        <div id="obj-preview" style="display:none;font-size:12px;color:var(--receita);margin-top:5px;font-weight:600;background:rgba(6,214,160,.08);border-radius:7px;padding:7px 10px"></div>
+        <div class="form-erro" id="obj-err">Preencha o nome e o valor</div>
+      </div>`, { onOk: () => {
+        const nome  = document.getElementById('obj-nome').value.trim();
+        const emoji = document.getElementById('obj-emoji').value.trim() || '🎁';
+        const valor = parseFloat(document.getElementById('obj-valor').value) || 0;
+        if (!nome || !valor) { document.getElementById('obj-err').classList.add('vis'); return; }
+        const arr = Storage.objCompras();
+        arr.push({ id: Utils.uuid(), nome, emoji, valor, alvo: valor * 10, criadoEm: Utils.dataHoje() });
+        Storage.salvarObjCompras(arr);
+        Modal.fechar(); this.render();
+        toast(`🎯 Objetivo "${nome}" adicionado! Invista ${(valor*10).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} para liberar.`);
+    }});
+  },
+
+  _comprar(id) {
+    const obj = Storage.objCompras().find(o => o.id === id);
+    if (!obj) return;
+    Modal.confirmar(`Confirma a compra de ${obj.emoji} ${obj.nome} por ${Utils.moeda(obj.valor)}? Você ganhou essa recompensa! 🎉`, () => {
+      Storage.salvarObjCompras(Storage.objCompras().filter(o => o.id !== id));
+      this.render();
+      toast(`Parabéns! Aproveite seu ${obj.nome}! ${obj.emoji}🎉`);
+    });
+  },
+
+  _guardarCofre(id) {
+    const obj = Storage.objCompras().find(o => o.id === id);
+    if (!obj) return;
+    Modal.confirmar(`Decidiu não comprar ${obj.emoji} ${obj.nome}?\n\nO valor (${Utils.moeda(obj.alvo)}) vai para o cofre secreto — invisível para não te tentar.`, () => {
+      const cofre = Storage.objCofre();
+      cofre.push({ ...obj, arquivadoEm: Utils.dataHoje() });
+      Storage.salvarObjCofre(cofre);
+      Storage.salvarObjCompras(Storage.objCompras().filter(o => o.id !== id));
+      this.render();
+      toast('🔐 Guardado no cofre! Continue investindo!');
+    });
+  },
+
+  _excluirObj(id) {
+    Modal.confirmar('Remover este objetivo?', () => {
+      Storage.salvarObjCompras(Storage.objCompras().filter(o => o.id !== id));
+      this.render(); toast('Objetivo removido.');
+    });
+  },
 };
 
 /* ═══════════════════════════════════════════════════════════
