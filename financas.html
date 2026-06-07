@@ -3842,7 +3842,6 @@ Telas.investimentos = {
         </div>` : `<div class="vazio"><div class="vazio-ico">📈</div>
           <p>Nenhum aporte registrado ainda.<br>Diga no chat: <em>"investi 900 hoje"</em></p></div>`}
 
-        ${this._htmlCofre()}
 
       </div>`;
 
@@ -3936,18 +3935,21 @@ Telas.investimentos = {
   _htmlObjetivos(patrimonio, metaInv, taxa) {
     const objs = Storage.objCompras();
     const cards = objs.map(obj => {
-      const pct = patrimonio > 0 ? Math.min(100, Math.round(patrimonio / obj.alvo * 100)) : 0;
-      const atingido = patrimonio >= obj.alvo;
-      const falta = Math.max(0, obj.alvo - patrimonio);
-      const mesesFalta = taxa > 0 && metaInv > 0 ? Fin.mesesParaAlvo(patrimonio, metaInv, taxa, obj.alvo) : null;
-      const barClr = atingido ? 'var(--receita)' : pct > 60 ? 'var(--aviso)' : 'var(--prim)';
+      // progresso conta só os investimentos NOVOS desde que o objetivo foi criado
+      const base     = obj.patrimonioInicial ?? 0;
+      const investido = Math.max(0, patrimonio - base);
+      const pct      = Math.min(100, Math.round(investido / obj.alvo * 100));
+      const atingido = investido >= obj.alvo;
+      const falta    = Math.max(0, obj.alvo - investido);
+      const mesesFalta = taxa > 0 && metaInv > 0 ? Fin.mesesParaAlvo(investido, metaInv, taxa, obj.alvo) : null;
+      const barClr   = atingido ? 'var(--receita)' : pct > 60 ? 'var(--aviso)' : 'var(--prim)';
       return `<div class="obj-card ${atingido ? 'atingido' : ''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div style="display:flex;align-items:center;gap:12px">
             <span class="obj-emoji">${Utils.esc(obj.emoji)}</span>
             <div>
               <div style="font-size:14px;font-weight:700">${Utils.esc(obj.nome)}</div>
-              <div style="font-size:11px;color:var(--txt2)">Custa ${Utils.moeda(obj.valor)} · Precisa investir ${Utils.moeda(obj.alvo)}</div>
+              <div style="font-size:11px;color:var(--txt2)">Custa ${Utils.moeda(obj.valor)} · Meta: investir ${Utils.moeda(obj.alvo)}</div>
             </div>
           </div>
           ${!atingido ? `<button class="btn btn-ghost btn-sm btn-icon" style="flex-shrink:0" onclick="Telas.investimentos._excluirObj('${obj.id}')">🗑️</button>` : ''}
@@ -3959,16 +3961,16 @@ Telas.investimentos = {
           <span style="color:${atingido ? 'var(--receita)' : 'var(--txt2)'}">
             ${atingido ? '🎉 Objetivo atingido!' : `${pct}% · falta ${Utils.moeda(falta)}`}
           </span>
-          <span>${!atingido && mesesFalta && mesesFalta < 600 ? `~${mesesFalta} meses` : atingido ? Utils.moeda(patrimonio) + ' investidos' : ''}</span>
+          <span>${!atingido && mesesFalta && mesesFalta < 600 ? `~${mesesFalta} meses` : atingido ? Utils.moeda(investido) + ' investidos' : ''}</span>
         </div>
         ${atingido ? `
           <div style="background:rgba(6,214,160,.1);border:1px solid rgba(6,214,160,.3);border-radius:10px;padding:12px;margin-top:12px">
             <div style="font-size:12px;color:var(--receita);font-weight:700;margin-bottom:10px">
-              Você já tem ${Utils.moeda(patrimonio)} investidos — pode comprar com segurança!
+              Você investiu ${Utils.moeda(investido)} desde que criou esse objetivo — pode comprar com segurança!
             </div>
             <div class="obj-acoes">
               <button class="btn btn-prim btn-sm" onclick="Telas.investimentos._comprar('${obj.id}')">🛍️ Vou comprar!</button>
-              <button class="btn btn-ghost btn-sm" onclick="Telas.investimentos._guardarCofre('${obj.id}')">🔐 Não quero mais — guardar</button>
+              <button class="btn btn-ghost btn-sm" onclick="Telas.investimentos._guardarCofre('${obj.id}')">🔐 Não quero mais</button>
             </div>
           </div>` : ''}
       </div>`;
@@ -3985,37 +3987,7 @@ Telas.investimentos = {
       </div>`}`;
   },
 
-  _htmlCofre() {
-    const cofre = Storage.objCofre();
-    if (!cofre.length) return '';
-    const n = cofre.length;
-    return `<div class="cofre-wrap">
-      <button class="cofre-toggle" id="cofre-btn"
-        onclick="const b=document.getElementById('cofre-body');const vis=b.style.display!=='none';b.style.display=vis?'none':'block';document.getElementById('cofre-btn').innerHTML=vis?'🔐 &nbsp;Ver cofre secreto (${n} ${n===1?'item':'itens'})':'🔒 &nbsp;Fechar cofre'">
-        🔐 &nbsp;Ver cofre secreto (${n} ${n===1?'item guardado':'itens guardados'})
-      </button>
-      <div class="cofre-body" id="cofre-body" style="display:none">
-        <div style="font-size:11px;color:var(--txt2);padding:8px 2px 10px;font-style:italic;line-height:1.55">
-          Itens que você decidiu não comprar. O valor já está no seu patrimônio.<br>
-          Toque no valor para revelar. 👇
-        </div>
-        ${cofre.map(o => `
-          <div class="cofre-item">
-            <div class="cofre-item-nome">
-              <span style="font-size:20px">${Utils.esc(o.emoji)}</span>
-              <div>
-                <div style="font-weight:600">${Utils.esc(o.nome)}</div>
-                <div style="font-size:10px;color:var(--txt2)">guardado em ${Utils.formatarData(o.arquivadoEm)}</div>
-              </div>
-            </div>
-            <span class="blur-val" title="toque para revelar" onclick="this.classList.toggle('rev')">${Utils.moeda(o.alvo)}</span>
-          </div>`).join('')}
-        <div style="font-size:10px;color:var(--txt2);padding:4px 2px;font-style:italic">
-          💪 Cada item que você resistiu virou patrimônio real.
-        </div>
-      </div>
-    </div>`;
-  },
+  _htmlCofre() { return ''; }, // cofre fica em Config — não aparece aqui
 
   _novoObjetivo() {
     Modal.abrir('🎯 Novo Objetivo de Compra', `
@@ -4046,7 +4018,7 @@ Telas.investimentos = {
         const valor = parseFloat(document.getElementById('obj-valor').value) || 0;
         if (!nome || !valor) { document.getElementById('obj-err').classList.add('vis'); return; }
         const arr = Storage.objCompras();
-        arr.push({ id: Utils.uuid(), nome, emoji, valor, alvo: valor * 10, criadoEm: Utils.dataHoje() });
+        arr.push({ id: Utils.uuid(), nome, emoji, valor, alvo: valor * 10, criadoEm: Utils.dataHoje(), patrimonioInicial: Fin.patrimonioTotal() });
         Storage.salvarObjCompras(arr);
         Modal.fechar(); this.render();
         toast(`🎯 Objetivo "${nome}" adicionado! Invista ${(valor*10).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} para liberar.`);
@@ -4230,10 +4202,42 @@ Telas.config = {
         </ul>
       </div>
 
+      ${Telas.config._htmlCofre()}
+
       <div style="text-align:center;font-size:11px;color:var(--txt2);padding:10px">
         Controle Financeiro Offline v1.0 • Dados salvos localmente
       </div>`;
   },
+  _htmlCofre() {
+    const cofre = Storage.objCofre();
+    if (!cofre.length) return '';
+    const n = cofre.length;
+    return `<div style="margin-top:24px;border-top:1px solid var(--borda);padding-top:20px">
+      <button class="cofre-toggle" id="cofre-cfg-btn"
+        onclick="const b=document.getElementById('cofre-cfg-body');const aberto=b.style.display!=='none';b.style.display=aberto?'none':'block';this.innerHTML=aberto?'🔐 &nbsp;Cofre secreto (${n} ${n===1?'item':'itens'})':'🔒 &nbsp;Fechar cofre'">
+        🔐 &nbsp;Cofre secreto (${n} ${n===1?'item':'itens'})
+      </button>
+      <div id="cofre-cfg-body" style="display:none;margin-top:10px">
+        <div style="font-size:11px;color:var(--txt2);padding:0 0 10px;font-style:italic;line-height:1.6">
+          Objetivos que você decidiu não comprar.<br>
+          O valor acumulado está no seu patrimônio — você resistiu e ganhou. 💪<br>
+          Toque no valor para revelar.
+        </div>
+        ${cofre.map(o => `
+          <div class="cofre-item">
+            <div class="cofre-item-nome">
+              <span style="font-size:20px">${Utils.esc(o.emoji)}</span>
+              <div>
+                <div style="font-weight:600">${Utils.esc(o.nome)}</div>
+                <div style="font-size:10px;color:var(--txt2)">guardado em ${Utils.formatarData(o.arquivadoEm)}</div>
+              </div>
+            </div>
+            <span class="blur-val" onclick="this.classList.toggle('rev')">${Utils.moeda(o.alvo)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  },
+
   salvarNotif() {
     const ativo = document.getElementById('notif-ativo')?.checked || false;
     const diasAntes = parseInt(document.getElementById('notif-dias')?.value) || 3;
