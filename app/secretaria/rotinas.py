@@ -215,7 +215,7 @@ def responder_app(texto: str) -> dict:
             except Exception as erro:  # a pessoa precisa de uma resposta, não de um "Erro 500"
                 log.exception("Falha ao responder pelo app")
                 resposta = ("Tive um problema técnico e não consegui terminar isso agora "
-                            f"({type(erro).__name__}). Tenta de novo daqui a pouco?")
+                            f"({html.escape(ia.motivo_falha(erro))}). Tenta de novo daqui a pouco?")
                 if not registro.vazio():
                     resposta += " O que eu já tinha alterado pode ser desfeito no botão abaixo."
         resposta_id = repo.salvar_mensagem("assistant", resposta)
@@ -256,7 +256,7 @@ def processar_pendentes() -> None:
             except Exception as erro:  # fronteira do job: a pessoa precisa saber que falhou
                 log.exception("Falha ao responder")
                 aviso = ("Tive um problema técnico e não consegui processar isso agora "
-                         f"({type(erro).__name__}). Me manda de novo daqui a pouco?")
+                         f"({html.escape(ia.motivo_falha(erro))}). Me manda de novo daqui a pouco?")
                 telegram.enviar(config.TELEGRAM_OWNER_ID, aviso)
                 repo.salvar_mensagem("assistant", "(falha técnica: as mensagens acima NÃO foram processadas)")
             finally:
