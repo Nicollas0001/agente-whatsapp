@@ -827,10 +827,15 @@ const SyncMerge = {
     }
     return saida;
   },
-  // primeira sincronização deste aparelho: vale o Firebase, mas o que só existia aqui é mantido
+  // primeira sincronização deste aparelho: junta os dois lados sem apagar nada,
+  // porque tanto o Firebase quanto o aparelho podem estar desatualizados
   primeiraVez(local, remoto) {
     const saida = {};
-    for (const campo of Object.keys(this.CAMPOS)) saida[campo] = remoto?.[campo] ?? local?.[campo] ?? null;
+    for (const campo of Object.keys(this.CAMPOS)) {
+      const l = local?.[campo], r = remoto?.[campo];
+      if (Array.isArray(l) || Array.isArray(r)) saida[campo] = this.lista([], l, r);
+      else saida[campo] = r ?? l ?? null;
+    }
     return saida;
   },
   doRemoto(dados) {
@@ -1033,8 +1038,8 @@ const Sync = (function() {
         _painelLogin = true;
         Modal.abrir('🔑 Sincronizar', `
           <p style="font-size:14px;line-height:1.7;color:var(--txt2)">
-            Entre com a sua conta Google para ver aqui o que você manda para a secretária no Telegram
-            e para os seus dados ficarem protegidos (só a sua conta acessa).</p>
+            Entre com a sua conta Google para usar a secretária e manter seus dados sincronizados
+            e protegidos (só a sua conta acessa).</p>
           <div style="margin-top:14px"><button class="btn btn-prim" onclick="Sync.entrar()">Entrar com Google</button></div>`,
           { footer: false });
       } else {
