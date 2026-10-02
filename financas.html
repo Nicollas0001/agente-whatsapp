@@ -455,6 +455,11 @@ canvas { display: block; }
 .hh-bar-fill { height: 100%; background: linear-gradient(90deg,#06D6A0,#6C63FF); border-radius: 4px; transition: width .6s ease; }
 .hh-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .hh-liberdade { font-size: 11px; color: rgba(233,236,239,.72); }
+.hh-meta { position: relative; margin-top: 14px; }
+.hh-meta .hh-bar { margin-top: 6px; }
+.hh-meta-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13.5px; font-weight: 700; }
+.hh-meta-top strong { font-size: 13px; color: var(--receita); }
+.hh-meta-sub { font-size: 11px; color: rgba(233,236,239,.72); margin-top: 5px; line-height: 1.5; }
 .hh-cta { background: linear-gradient(135deg,#06D6A0,#5A52D5); color: #fff; border: none; border-radius: 10px;
   padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
   box-shadow: 0 4px 14px rgba(6,214,160,.3); transition: transform .15s; }
@@ -3546,6 +3551,9 @@ Telas.dashboard = {
     'Liberdade financeira não é sorte, é hábito — e o hábito você já tem.',
   ],
 
+  // a motivação da tela inicial
+  _metas: { investido: 20000, rendaMensal: 500 },
+
   _htmlHero() {
     const nome      = 'Nicollas';
     const h         = new Date().getHours();
@@ -3575,50 +3583,33 @@ Telas.dashboard = {
 
     const scoreClr = score >= 80 ? '#06D6A0' : score >= 50 ? '#FFD166' : '#EF476F';
 
-    // ── objetivo de compra ativo (primeiro da lista) ──────────
-    const objs   = Storage.objCompras();
-    const objAtivo = objs[0] ?? null;
-    let barPct, barLabel, barSub, ctaLabel, ctaAction, stat2Lbl, stat2Val, stat2Clr;
+    // quanto foi investido este mês: aportes + transferências para contas de investimento
+    const contasInv = new Set(Storage.contas().filter(c => c.tipo === 'investimento').map(c => c.id));
+    const aporteMes = Storage.investimentos().filter(x => Utils.datasNoMes(x.data, mes, ano)).reduce((s,x) => s + x.valor, 0)
+      + Storage.transacoes().filter(t => t.tipo === 'transferencia' && contasInv.has(t.contaDestinoId)
+          && Utils.datasNoMes(t.data, mes, ano)).reduce((s,t) => s + t.valor, 0);
 
-    if (objAtivo) {
-      const base      = objAtivo.patrimonioInicial ?? 0;
-      const investido = Math.max(0, patrimonio - base);
-      const pct       = Math.min(100, patrimonio > base ? Math.round(investido / objAtivo.alvo * 100) : 0);
-      const atingido  = investido >= objAtivo.alvo;
-      const falta     = Math.max(0, objAtivo.alvo - investido);
-      const mesesFalta = taxa > 0 && metaInv > 0 ? Fin.mesesParaAlvo(investido, metaInv, taxa, objAtivo.alvo) : null;
-
-      barPct    = pct;
-      stat2Lbl  = Utils.esc(objAtivo.emoji + ' ' + objAtivo.nome);
-      stat2Val  = atingido ? '🎉 Pronto!' : `${pct}%`;
-      stat2Clr  = atingido ? 'var(--receita)' : pct > 60 ? 'var(--aviso)' : 'var(--txt)';
-      barLabel  = atingido
-        ? `🎉 ${Utils.esc(objAtivo.emoji)} ${Utils.esc(objAtivo.nome)} — pode comprar!`
-        : `${Utils.esc(objAtivo.emoji)} ${Utils.esc(objAtivo.nome)} · falta ${Utils.moeda(falta)}${mesesFalta && mesesFalta < 600 ? ` (~${mesesFalta} meses)` : ''}`;
-      barSub    = atingido ? '' : `Investido: ${Utils.moeda(investido)} de ${Utils.moeda(objAtivo.alvo)}`;
-      ctaLabel  = atingido ? `${objAtivo.emoji} Ver objetivo` : '🎯 Meu objetivo';
-      ctaAction = "location.hash='investimentos'";
-    } else {
-      // sem objetivo: mostra liberdade
-      const alvo   = Storage.patrimonioAlvo();
-      const libPct = Math.min(100, patrimonio > 0 ? Math.round(patrimonio / alvo * 100) : 0);
-      const mesesLib = Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo);
-      const dataLib  = (() => {
-        const d = new Date(); d.setMonth(d.getMonth() + mesesLib);
-        const m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-        return `${m[d.getMonth()]}/${d.getFullYear()}`;
-      })();
-      barPct    = libPct;
-      stat2Lbl  = 'Liberdade';
-      stat2Val  = `${libPct}%`;
-      stat2Clr  = 'var(--txt)';
-      barLabel  = mesesLib < 600
-        ? `🏁 Liberdade prevista: <strong style="color:#fff">${dataLib}</strong> · faltam ${mesesLib} meses`
-        : '🏁 Adicione um objetivo de compra para começar';
-      barSub    = '';
-      ctaLabel  = '🎯 Criar objetivo';
-      ctaAction = "location.hash='investimentos'";
-    }
+    // as duas metas: R$ 20 mil investidos e R$ 500/mês de renda passiva
+    const meta     = this._metas;
+    const rendaHoje = patrimonio * taxa;
+    const capitalRenda = taxa > 0 ? meta.rendaMensal / taxa : 0;
+    const pct = (v, alvo) => alvo > 0 ? Math.max(0, Math.min(100, Math.round(v / alvo * 100))) : 0;
+    const previsao = alvo => {
+      if (patrimonio >= alvo) return '';
+      const n = metaInv > 0 && taxa >= 0 ? Fin.mesesParaAlvo(patrimonio, metaInv, taxa, alvo) : 600;
+      if (n >= 600) return ' · defina quanto vai investir por mês em Investir';
+      const d = new Date(); d.setMonth(d.getMonth() + n);
+      const m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      return ` · chega em <strong style="color:#fff">${m[d.getMonth()]}/${d.getFullYear()}</strong> investindo ${Utils.moeda(metaInv)}/mês`;
+    };
+    const pctInv   = pct(patrimonio, meta.investido);
+    const pctRenda = pct(rendaHoje, meta.rendaMensal);
+    const bloco = (titulo, p, linha) => `
+        <div class="hh-meta">
+          <div class="hh-meta-top"><span>${titulo}</span><strong>${p >= 100 ? '🎉' : p + '%'}</strong></div>
+          <div class="hh-bar"><div class="hh-bar-fill" style="width:${p}%"></div></div>
+          <div class="hh-meta-sub">${linha}</div>
+        </div>`;
 
     return `
       <div class="home-hero">
@@ -3632,24 +3623,31 @@ Telas.dashboard = {
             <span class="hh-score-lbl">SCORE</span>
           </div>
         </div>
+        ${bloco(`🎯 ${Utils.moeda(meta.investido).replace(',00', '')} investidos`, pctInv,
+          patrimonio >= meta.investido ? 'Meta batida! 🎉'
+            : `${Utils.moeda(patrimonio)} de ${Utils.moeda(meta.investido)} · faltam ${Utils.moeda(meta.investido - patrimonio)}${previsao(meta.investido)}`)}
+        ${bloco(`💸 ${Utils.moeda(meta.rendaMensal).replace(',00', '')}/mês de renda passiva`, pctRenda,
+          rendaHoje >= meta.rendaMensal ? 'Sua renda passiva já paga a meta! 🎉'
+            : taxa > 0
+              ? `Hoje rende ~${Utils.moeda(rendaHoje)}/mês · precisa de ~${Utils.moeda(capitalRenda)} investidos a ${(taxa*100).toFixed(1).replace('.', ',')}% a.m.${previsao(capitalRenda)}`
+              : 'Defina o rendimento mensal em Investir para calcular')}
         <div class="hh-stats">
           <div class="hh-stat">
-            <div class="hh-stat-lbl">Investido</div>
-            <div class="hh-stat-val" style="color:var(--receita);font-size:13px">${Utils.moeda(patrimonio)}</div>
+            <div class="hh-stat-lbl">Investido no mês</div>
+            <div class="hh-stat-val" style="color:${metaInv > 0 && aporteMes >= metaInv ? 'var(--receita)' : 'var(--txt)'};font-size:13px">${Utils.moeda(aporteMes)}</div>
           </div>
           <div class="hh-stat">
-            <div class="hh-stat-lbl" style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${stat2Lbl}</div>
-            <div class="hh-stat-val" style="color:${stat2Clr}">${stat2Val}</div>
+            <div class="hh-stat-lbl">Meta do mês</div>
+            <div class="hh-stat-val" style="font-size:13px">${metaInv > 0 ? Utils.moeda(metaInv) : '—'}</div>
           </div>
           <div class="hh-stat">
             <div class="hh-stat-lbl">Sequência</div>
             <div class="hh-stat-val">${streak > 0 ? `🔥 ${streak}` : '—'}</div>
           </div>
         </div>
-        <div class="hh-bar"><div class="hh-bar-fill" style="width:${barPct}%"></div></div>
         <div class="hh-foot">
-          <span class="hh-liberdade">${barLabel}${barSub ? `<br><span style="font-size:10px;opacity:.7">${barSub}</span>` : ''}</span>
-          <button class="hh-cta" onclick="${ctaAction}">${ctaLabel}</button>
+          <span class="hh-liberdade">Cada aporte encurta as duas barras.</span>
+          <button class="hh-cta" onclick="location.hash='investimentos'">📈 Investir</button>
         </div>
       </div>`;
   },
