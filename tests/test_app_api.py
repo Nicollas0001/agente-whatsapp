@@ -73,6 +73,27 @@ def test_falha_no_meio_responde_e_deixa_desfazer(cliente, monkeypatch):
     assert cliente.get("/secretaria/app/tarefas").json() == []
 
 
+def _erro_api(classe, status, mensagem):
+    import anthropic
+    import httpx2
+    resposta = httpx2.Response(status, request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
+    corpo = {"type": "error", "error": {"type": "invalid_request_error", "message": mensagem}}
+    return getattr(anthropic, classe)(f"Error code: {status}", response=resposta, body=corpo)
+
+
+@pytest.mark.parametrize("classe,status,mensagem,esperado", [
+    ("BadRequestError", 400, "Your credit balance is too low to access the Anthropic API.", "acabou o crédito"),
+    ("BadRequestError", 400, "tools.3.custom.input_schema: <bad>", "BadRequestError: tools.3.custom.input_schema: &lt;bad&gt;"),
+    ("AuthenticationError", 401, "invalid x-api-key", "recusou a chave"),
+])
+def test_falha_da_api_diz_o_motivo(cliente, monkeypatch, classe, status, mensagem, esperado):
+    def falha(pedido, planejamento=False):
+        raise _erro_api(classe, status, mensagem)
+
+    monkeypatch.setattr(ia, "responder", falha)
+    corpo = cliente.post("/secretaria/app/mensagem", json={"texto": "oi"}).json()
+    assert esperado in corpo["resposta"]
+
 def test_comandos_sem_ia_pelo_app(cliente):
     r = cliente.post("/secretaria/app/mensagem", json={"texto": "/tarefas"}).json()
     assert "Nada em aberto" in r["resposta"] and r["desfazivel"] is False

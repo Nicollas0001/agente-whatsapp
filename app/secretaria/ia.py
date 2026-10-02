@@ -412,6 +412,19 @@ def _chamar(mensagens: list, modelo: str, esforco: str):
     )
 
 
+def motivo_falha(erro: Exception) -> str:
+    """Diz em português por que a chamada ao Claude falhou, com o motivo que a API devolveu."""
+    if isinstance(erro, anthropic.AuthenticationError):
+        return "a Anthropic recusou a chave (ANTHROPIC_API_KEY)"
+    if isinstance(erro, anthropic.APIStatusError):
+        corpo = erro.body if isinstance(erro.body, dict) else {}
+        detalhe = str((corpo.get("error") or {}).get("message") or "")
+        if "credit balance" in detalhe.lower():
+            return "acabou o crédito da Anthropic; dá para colocar mais em console.anthropic.com, em Billing"
+        if detalhe:
+            return f"{type(erro).__name__}: {detalhe[:300]}"
+    return type(erro).__name__
+
 def _texto(resposta) -> str:
     return "\n\n".join(b.text.strip() for b in resposta.content if b.type == "text" and b.text.strip())
 
