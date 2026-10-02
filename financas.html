@@ -4374,7 +4374,9 @@ Telas.config = {
           <button class="btn btn-prim" onclick="Telas.config.salvarChaveIA()">Salvar</button>
           <button class="btn btn-ghost" onclick="Telas.config.removerChaveIA()">Remover</button>
         </div>
-        <p style="font-size:11px;color:var(--txt2);margin-top:8px">A chave fica salva só neste dispositivo. Crie em <strong>console.anthropic.com</strong> → API Keys.</p>
+        <p style="font-size:11px;color:var(--txt2);margin-top:8px">${Secretaria.noServidor
+          ? 'A secretária passa a usar esta chave assim que a Anthropic aceitar. Crie em <strong>platform.claude.com</strong> → Chaves de API → Criar chave, com <strong>Escopo: Espaço de trabalho padrão</strong> e <strong>Expira: Nunca</strong>.'
+          : 'A chave fica salva só neste dispositivo. Crie em <strong>console.anthropic.com</strong> → API Keys.'}</p>
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -4565,10 +4567,18 @@ Telas.config = {
     Utils.toast('Metas salvas!');
     if (Router.atual === 'dashboard') Telas.dashboard.render();
   },
-  salvarChaveIA() {
+  async salvarChaveIA() {
     const val = (document.getElementById('ia-key-input')?.value || '').trim();
     if (!val) { Utils.toast('Digite a chave antes de salvar.'); return; }
     if (!val.startsWith('sk-ant-')) { Utils.toast('Chave inválida — deve começar com sk-ant-'); return; }
+    if (Secretaria.disponivel) {
+      Utils.toast('Conferindo a chave com a Anthropic…', 8000);
+      try { await Secretaria.api('POST', '/chave', { chave: val }); }
+      catch(e) { Utils.toast('❌ ' + e.message, 6000); return; }
+      localStorage.setItem('anthropic_key', val);
+      Utils.toast('✅ A Anthropic aceitou a chave. A secretária já pode responder.', 4000);
+      return;
+    }
     localStorage.setItem('anthropic_key', val);
     Utils.toast('✅ Chave salva! O assistente já usa IA.');
   },

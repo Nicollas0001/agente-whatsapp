@@ -1,10 +1,9 @@
 import hmac
 import logging
-import os
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 
-from app.secretaria import banco, config, rotinas, telegram, repositorio as repo
+from app.secretaria import banco, config, ia, rotinas, telegram, repositorio as repo
 
 log = logging.getLogger("secretaria")
 router = APIRouter()
@@ -65,7 +64,7 @@ def status():
     return {
         "telegram_token": bool(config.TELEGRAM_BOT_TOKEN),
         "dono_configurado": bool(config.TELEGRAM_OWNER_ID),
-        "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "anthropic_key": bool(ia.chave()),
         "firebase": banco.configurado(),
         "dono_email": bool(config.DONO_EMAIL),
         "url_publica": config.PUBLIC_URL or None,
