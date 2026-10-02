@@ -63,3 +63,13 @@ test('primeira sincronização: junta os dois lados e não perde o que só exist
   assert.deepEqual(final.objCompras, [{ id: 'o1', nome: 'Tênis' }]);
   assert.equal(final.metaInvest, 1000);
 });
+
+test('primeira sincronização de aparelho que só tem a semente não ressuscita o que foi apagado', () => {
+  const semente = { transacoes: [tx('a', 10), tx('b', 20), tx('c', 30)], metaInvest: 900 };
+  const local = { transacoes: [tx('a', 10), tx('b', 20), tx('c', 30), tx('so-aqui', 1)], metaInvest: 900 };
+  const remoto = { transacoes: [tx('a', 15), tx('b', 20), tx('novo-la', 5)], metaInvest: 1000 };   // apagou "c" lá
+  const final = SyncMerge.primeiraVez(local, remoto, semente);
+  assert.deepEqual(ids(final.transacoes), ['a', 'b', 'novo-la', 'so-aqui']);
+  assert.equal(final.transacoes[0].valor, 15);
+  assert.equal(final.metaInvest, 1000);
+});
