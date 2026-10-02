@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Controle Financeiro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#6C63FF">
 <style>
 :root {
   --prim: #6C63FF;
@@ -550,7 +552,7 @@ canvas { display: block; }
   #nav a .nav-ico { font-size: 20px; }
   #nav a span:not(.nav-ico) { display: block; }
   .sync-wrap { margin-top: auto; padding: 16px 0 4px; border-top: 1px solid var(--borda); }
-  #conteudo { margin-left: 160px; padding: 28px 32px 32px; }
+  #conteudo { margin-left: 160px; width: calc(100% - 160px); padding: 28px 32px 32px; }
   #fab { bottom: 28px; right: 28px; }
   #toast { bottom: 28px; left: 50%; transform: translateX(-50%); }
   .card-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
@@ -560,7 +562,7 @@ canvas { display: block; }
 @media (min-width: 1200px) {
   #nav { width: 200px; padding: 28px 0 14px; }
   #nav a { padding: 13px 22px; font-size: 13px; gap: 12px; }
-  #conteudo { margin-left: 200px; padding: 28px 36px 36px; max-width: 960px; }
+  #conteudo { margin-left: 200px; width: calc(100% - 200px); padding: 28px 36px 36px; max-width: 960px; }
   #modal-box { max-width: 520px; }
 }
 
@@ -613,11 +615,40 @@ canvas { display: block; }
 .recomp-mes { text-align:center; font-size:11px; }
 .recomp-ico { font-size:22px; display:block; }
 .sync-wrap { padding:6px 0 2px; text-align:center; font-size:16px; line-height:1; }
-#sync-dot { cursor:default; }
+#sync-dot { cursor:pointer; }
+/* ── SECRETÁRIA E TAREFAS ─────────────────────────────── */
+.sec-topo { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.sec-topo h1 { font-size:20px; font-weight:800; }
+.sec-atalhos { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; }
+.sec-atalhos button { flex-shrink:0; background:var(--sup2); color:var(--txt); border:1px solid var(--borda); border-radius:18px; padding:7px 13px; font-size:13px; cursor:pointer; }
+.sec-atalhos button:hover { border-color:var(--prim); }
+.sec-hist { display:flex; flex-direction:column; gap:10px; height:calc(100vh - 290px); min-height:260px; overflow-y:auto; padding:4px 2px 10px; }
+.sec-msg { max-width:88%; padding:10px 14px; border-radius:14px; font-size:14px; line-height:1.55; white-space:pre-wrap; word-wrap:break-word; }
+.sec-msg.user { align-self:flex-end; background:var(--prim); color:#fff; border-bottom-right-radius:4px; }
+.sec-msg.assistant { align-self:flex-start; background:var(--sup2); color:var(--txt); border-bottom-left-radius:4px; }
+.sec-msg.erro { border-left:3px solid var(--despesa); }
+.sec-msg .sec-hora { display:block; font-size:10px; opacity:.6; margin-top:4px; }
+.sec-desfazer { margin-top:6px; background:transparent; border:1px solid var(--borda); color:var(--txt2); border-radius:12px; padding:3px 10px; font-size:12px; cursor:pointer; }
+.sec-desfazer:hover { color:var(--txt); border-color:var(--txt2); }
+.sec-digitando { opacity:.6; font-style:italic; }
+.sec-entrada { margin-top:8px; }
+.sec-aviso { background:var(--sup2); border-radius:12px; padding:16px; font-size:14px; line-height:1.6; color:var(--txt2); }
+.tar-grupo { margin-bottom:18px; }
+.tar-grupo h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--txt2); margin-bottom:8px; }
+.tar-item { display:flex; align-items:flex-start; gap:12px; background:var(--sup); border:1px solid var(--borda); border-radius:12px; padding:12px 14px; margin-bottom:8px; cursor:pointer; }
+.tar-item:hover { border-color:var(--prim); }
+.tar-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--txt2); background:transparent; flex-shrink:0; cursor:pointer; margin-top:1px; }
+.tar-check:hover { border-color:var(--receita); background:rgba(6,214,160,.15); }
+.tar-titulo { font-size:15px; line-height:1.4; }
+.tar-meta { font-size:12px; color:var(--txt2); margin-top:3px; }
+.tar-meta .alta { color:var(--despesa); font-weight:700; }
+.tar-rapida { display:flex; gap:8px; margin-bottom:16px; }
+.tar-rapida input { flex:1; background:var(--sup2); border:1px solid var(--borda); border-radius:10px; padding:11px 13px; color:var(--txt); font-size:14px; }
 </style>
 <!-- Firebase Sync -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 <div id="app">
@@ -631,10 +662,14 @@ canvas { display: block; }
     <section class="tela" id="tela-investimentos"></section>
     <section class="tela" id="tela-config"></section>
     <section class="tela" id="tela-ajuste"></section>
+    <section class="tela" id="tela-secretaria"></section>
+    <section class="tela" id="tela-tarefas"></section>
   </main>
 
   <nav id="nav">
     <a href="#dashboard" data-tela="dashboard"><span class="nav-ico">🏠</span><span>Início</span></a>
+    <a href="#secretaria" data-tela="secretaria"><span class="nav-ico">💬</span><span>Secretária</span></a>
+    <a href="#tarefas"   data-tela="tarefas">  <span class="nav-ico">✅</span><span>Tarefas</span></a>
     <a href="#contas"    data-tela="contas">   <span class="nav-ico">🏦</span><span>Contas</span></a>
     <a href="#cartoes"   data-tela="cartoes">  <span class="nav-ico">💳</span><span>Cartões</span></a>
     <a href="#lancamentos" data-tela="lancamentos"><span class="nav-ico">📋</span><span>Lançamentos</span></a>
@@ -744,23 +779,104 @@ const Storage = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   SYNC (Firebase Firestore — auto-sync entre dispositivos)
+   SYNC (Firebase Firestore — entre aparelhos e com a secretária do Telegram)
+   - Só sincroniza com login Google (as regras do Firestore liberam só a sua conta).
+   - Ouve o documento em tempo real: o que a secretária lança aparece na hora.
+   - Ao salvar, junta as mudanças daqui com as que chegaram de fora (por id,
+     dentro de uma transação), em vez de sobrescrever o documento inteiro.
 ═══════════════════════════════════════════════════════════ */
+/* <merge> */
+const SyncMerge = {
+  // campo no Firestore -> chave no localStorage (ff_<chave>)
+  CAMPOS: { contas:'contas', cartoes:'cartoes', transacoes:'transacoes', categorias:'categorias',
+    fixos:'fixos', fixosLog:'fixoslog', investimentos:'investimentos', metaInvest:'metainvest',
+    recompensas:'recompensas', metas:'metas', taxaInvest:'taxainvest', objCompras:'objcompras',
+    objCofre:'objcofre', perfumeMeta:'perfumemeta', patrimonioAlvo:'patralvo', alvoAuto:'alvoauto',
+    recompNome:'recompnome', recompEmoji:'recompemoji' },
+  // JSON com chaves ordenadas: o Firestore devolve os campos em outra ordem
+  estavel(v) {
+    if (Array.isArray(v)) return '[' + v.map(x => this.estavel(x)).join(',') + ']';
+    if (v && typeof v === 'object')
+      return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + this.estavel(v[k])).join(',') + '}';
+    return JSON.stringify(v === undefined ? null : v);
+  },
+  igual(a, b) { return this.estavel(a) === this.estavel(b); },
+  _chave(item) { return item && typeof item === 'object' && item.id != null ? 'id:' + item.id : 'v:' + this.estavel(item); },
+  _mapa(lista) { const m = new Map(); (lista || []).forEach(i => m.set(this._chave(i), i)); return m; },
+  // base = como estava na última sincronização; local = como está aqui; remoto = como está no Firebase
+  lista(base, local, remoto) {
+    const b = this._mapa(base), l = this._mapa(local), r = this._mapa(remoto);
+    const mudouAqui = k => l.has(k) && b.has(k) && !this.igual(l.get(k), b.get(k));
+    const saida = [];
+    for (const [k, item] of r) {
+      if (b.has(k) && !l.has(k)) continue;              // apagado aqui
+      saida.push(mudouAqui(k) ? l.get(k) : item);       // editado aqui vence; senão, vale o de fora
+    }
+    for (const [k, item] of l) {
+      if (r.has(k)) continue;
+      if (!b.has(k) || mudouAqui(k)) saida.push(item);  // criado aqui (ou apagado lá mas editado aqui)
+    }
+    return saida;
+  },
+  juntar(base, local, remoto) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) {
+      const b = base?.[campo], l = local?.[campo], r = remoto?.[campo];
+      if (Array.isArray(l) || Array.isArray(r)) saida[campo] = this.lista(b, l, r);
+      else saida[campo] = this.igual(l, b) ? (r ?? null) : (l ?? null);
+    }
+    return saida;
+  },
+  // primeira sincronização deste aparelho: vale o Firebase, mas o que só existia aqui é mantido
+  primeiraVez(local, remoto) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) saida[campo] = remoto?.[campo] ?? local?.[campo] ?? null;
+    return saida;
+  },
+  doRemoto(dados) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) saida[campo] = dados?.[campo] ?? null;
+    return saida;
+  }
+};
+/* </merge> */
+
 const Sync = (function() {
-  let _db = null, _timer = null, _pulling = false;
+  let _db = null, _auth = null, _user = null, _timer = null, _unsub = null, _pronto = false, _painelLogin = false;
 
   function _doc() { return _db && _db.collection('financas').doc('dados'); }
 
   function _setStatus(s) {
     const el = document.getElementById('sync-dot');
     if (!el) return;
-    const icons = { idle:'🟡', syncing:'🔵', synced:'🟢', error:'🔴', offline:'⚫' };
-    const tips  = { idle:'Sync pendente', syncing:'Sincronizando…', synced:'Sincronizado ✓', error:'Erro de sync', offline:'Sem conexão' };
+    const icons = { idle:'🟡', syncing:'🔵', synced:'🟢', error:'🔴', offline:'⚫', login:'🔑' };
+    const tips  = { idle:'Sync pendente', syncing:'Sincronizando…', synced:'Sincronizado ✓', error:'Erro de sync',
+                    offline:'Sem conexão', login:'Toque para entrar e sincronizar' };
     el.textContent = icons[s] || '🟡';
     el.title = tips[s] || '';
   }
 
+  function _local() {
+    const estado = {};
+    for (const [campo, chave] of Object.entries(SyncMerge.CAMPOS)) estado[campo] = Storage.get(chave);
+    return estado;
+  }
+  // grava direto no localStorage (Storage.set não dispara push)
+  function _aplicar(estado) {
+    for (const [campo, chave] of Object.entries(SyncMerge.CAMPOS)) Storage.set(chave, estado[campo] ?? null);
+  }
+  function _base() { return Storage.get('syncbase'); }
+  function _marcarBase(estado, rev) { Storage.set('syncbase', estado); Storage.set('syncrev', rev || 0); }
+  function _revBase() { return Storage.get('syncrev') || 0; }
+  function _rerender() {
+    const t = typeof Router !== 'undefined' ? Router.atual : null;
+    if (t && Telas[t]?.render) Telas[t].render();
+  }
+  function _esc(t) { return String(t ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
   return {
+    get logado() { return !!_user; },
+
     init() {
       if (typeof firebase === 'undefined') { _setStatus('offline'); return; }
       try {
@@ -775,68 +891,172 @@ const Sync = (function() {
           });
         }
         _db = firebase.firestore();
+        _auth = firebase.auth();
+        if (new URLSearchParams(location.search).has('emulador')) {   // só para testes locais
+          _db.useEmulator('127.0.0.1', 8080);
+          _auth.useEmulator('http://127.0.0.1:9099');
+        }
+        _db.settings({ ignoreUndefinedProperties: true, merge: true });
         _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+        _auth.onAuthStateChanged(u => this._mudouLogin(u));
       } catch(e) { console.warn('Firebase init:', e); }
       window.addEventListener('online',  () => { _setStatus('idle'); this.push(); });
       window.addEventListener('offline', () => _setStatus('offline'));
       if (!navigator.onLine) _setStatus('offline');
+      document.getElementById('sync-dot')?.addEventListener('click', () => this.painel());
+    },
+
+    // espera o Firebase dizer se há alguém logado (sem travar o app se estiver offline)
+    aguardarLogin() {
+      if (!_auth) return Promise.resolve(null);
+      return new Promise(res => {
+        const t = setTimeout(() => res(_auth.currentUser), 5000);
+        const off = _auth.onAuthStateChanged(u => { clearTimeout(t); off(); res(u); });
+      });
+    },
+
+    _mudouLogin(u) {
+      const entrou = u && !_user;
+      _user = u;
+      if (u && _painelLogin) { _painelLogin = false; Modal.fechar(); }
+      if (!u) {
+        if (_unsub) { _unsub(); _unsub = null; }
+        _setStatus('login');
+        return;
+      }
+      if (entrou && _pronto) this.pull().then(() => _rerender());
+      else if (entrou) _rerender();
+    },
+
+    _ouvir() {
+      if (_unsub || !_user || !_db) return;
+      _unsub = _doc().onSnapshot(snap => {
+        if (!snap.exists || snap.metadata.hasPendingWrites) return;
+        const dados = snap.data();
+        const rev = dados.rev || 0;
+        if (rev === _revBase()) return;
+        const base = _base();
+        if (!base || !SyncMerge.igual(_local(), base)) { this.push(); return; }  // tem mudança daqui: o push junta
+        const remoto = SyncMerge.doRemoto(dados);
+        _aplicar(remoto);
+        _marcarBase(remoto, rev);
+        if (dados.versao) localStorage.setItem('ff_versao', dados.versao);
+        _setStatus('synced');
+        _rerender();
+        if (dados.alteradoPor === 'secretaria') Utils.toast('💬 Atualizado pela secretária');
+      }, e => {
+        console.warn('Sync listen:', e);
+        _setStatus(e.code === 'permission-denied' ? 'error' : 'offline');
+      });
     },
 
     push() {
-      if (!_db || _pulling) return;
+      if (!_db || !_user) return;
       clearTimeout(_timer);
       _timer = setTimeout(async () => {
         _setStatus('syncing');
+        let localInicio = null;
         try {
-          await _doc().set({
-            contas: Storage.contas(),
-            cartoes: Storage.cartoes(),
-            transacoes: Storage.transacoes(),
-            categorias: Storage.categorias(),
-            fixos: Storage.fixos(),
-            fixosLog: Storage.fixosLog(),
-            investimentos: Storage.investimentos(),
-            metaInvest: Storage.metaInvest(),
-            recompensas: Storage.recompensas(),
-            versao: localStorage.getItem('ff_versao') || '',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          const resultado = await _db.runTransaction(async tx => {
+            const snap = await tx.get(_doc());
+            const dados = snap.exists ? snap.data() : {};
+            const revRemota = dados.rev || 0;
+            const base = _base(), remoto = SyncMerge.doRemoto(dados);
+            localInicio = _local();
+            let final;
+            if (!snap.exists) final = localInicio;
+            else if (!base) final = SyncMerge.primeiraVez(localInicio, remoto);
+            else if (revRemota === _revBase()) {
+              if (SyncMerge.igual(localInicio, base)) return null;   // nada para enviar
+              final = localInicio;
+            } else final = SyncMerge.juntar(base, localInicio, remoto);
+            tx.set(_doc(), { ...final, versao: localStorage.getItem('ff_versao') || '', rev: revRemota + 1,
+                             alteradoPor: 'app', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            return { final, rev: revRemota + 1 };
           });
+          if (resultado) {
+            // se algo mudou aqui durante a transação, aplica por cima do que foi gravado
+            const atual = _local();
+            const novoLocal = SyncMerge.igual(atual, localInicio) ? resultado.final
+                            : SyncMerge.juntar(localInicio, atual, resultado.final);
+            _marcarBase(resultado.final, resultado.rev);
+            if (!SyncMerge.igual(novoLocal, atual)) { _aplicar(novoLocal); _rerender(); }
+            if (!SyncMerge.igual(novoLocal, resultado.final)) this.push();
+          }
           _setStatus('synced');
         } catch(e) {
           console.warn('Sync push:', e);
           _setStatus(navigator.onLine ? 'error' : 'offline');
+          if (e.code === 'permission-denied') Utils.toast('Essa conta Google não tem acesso a estes dados.');
         }
       }, 1500);
     },
 
     async pull() {
       if (!_db) return false;
+      if (!_user) _user = await this.aguardarLogin();
+      _pronto = true;
+      if (!_user) { _setStatus('login'); return false; }
       _setStatus('syncing');
       try {
         const snap = await _doc().get();
-        if (!snap.exists || !snap.data().contas) { _setStatus('idle'); return false; }
-        const d = snap.data();
-        _pulling = true;
-        if (d.contas)            Storage.salvarContas(d.contas);
-        if (d.cartoes)           Storage.salvarCartoes(d.cartoes);
-        if (d.transacoes)        Storage.salvarTransacoes(d.transacoes);
-        if (d.categorias)        Storage.salvarCategorias(d.categorias);
-        if (d.fixos)             Storage.salvarFixos(d.fixos);
-        if (d.fixosLog)          Storage.salvarFixosLog(d.fixosLog);
-        if (d.investimentos)     Storage.salvarInvestimentos(d.investimentos);
-        if (d.metaInvest != null) Storage.salvarMetaInvest(d.metaInvest);
-        if (d.recompensas)       Storage.salvarRecompensas(d.recompensas);
-        if (d.versao)            localStorage.setItem('ff_versao', d.versao);
-        _pulling = false;
+        if (!snap.exists || !snap.data().contas) { _setStatus('idle'); this._ouvir(); return false; }
+        const dados = snap.data();
+        const remoto = SyncMerge.doRemoto(dados), rev = dados.rev || 0;
+        const base = _base(), local = _local();
+        if (!base) {
+          const estado = SyncMerge.primeiraVez(local, remoto);
+          _aplicar(estado);
+          _marcarBase(remoto, rev);
+          if (!SyncMerge.igual(estado, remoto)) this.push();   // sobe o que só existia neste aparelho
+        } else if (SyncMerge.igual(local, base)) {
+          _aplicar(remoto);
+          _marcarBase(remoto, rev);
+        } else {
+          _aplicar(SyncMerge.juntar(base, local, remoto));     // mudanças feitas offline: junta e sobe
+          this.push();
+        }
+        if (dados.versao) localStorage.setItem('ff_versao', dados.versao);
         _setStatus('synced');
+        this._ouvir();
         return true;
       } catch(e) {
-        _pulling = false;
         console.warn('Sync pull:', e);
         _setStatus(navigator.onLine ? 'error' : 'offline');
         return false;
       }
-    }
+    },
+
+    painel() {
+      if (!_auth) return;
+      if (!_user) {
+        _painelLogin = true;
+        Modal.abrir('🔑 Sincronizar', `
+          <p style="font-size:14px;line-height:1.7;color:var(--txt2)">
+            Entre com a sua conta Google para ver aqui o que você manda para a secretária no Telegram
+            e para os seus dados ficarem protegidos (só a sua conta acessa).</p>
+          <div style="margin-top:14px"><button class="btn btn-prim" onclick="Sync.entrar()">Entrar com Google</button></div>`,
+          { footer: false });
+      } else {
+        _painelLogin = false;
+        Modal.abrir('Sincronização', `
+          <p style="font-size:14px;line-height:1.7;color:var(--txt2)">Conectado como <strong>${_esc(_user.email)}</strong>.</p>
+          <div style="margin-top:14px"><button class="btn btn-ghost" onclick="Sync.sair()">Sair desta conta</button></div>`,
+          { footer: false });
+      }
+    },
+
+    async entrar() {
+      try {
+        await _auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+        Modal.fechar();
+      } catch(e) {
+        if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
+          Utils.toast('Não consegui entrar: ' + (e.code || e.message));
+      }
+    },
+
+    async sair() { await _auth.signOut(); Modal.fechar(); }
   };
 })();
 
@@ -844,7 +1064,7 @@ const Sync = (function() {
 ['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
  'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas',
  'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto','salvarRecompNome','salvarRecompEmoji',
- 'salvarObjCompras','salvarObjCofre'
+ 'salvarObjCompras','salvarObjCofre','salvarMetas'
 ].forEach(fn => {
   const orig = Storage[fn].bind(Storage);
   Storage[fn] = function(...args) { orig(...args); Sync.push(); };
@@ -854,6 +1074,7 @@ const Sync = (function() {
    UTILS
 ═══════════════════════════════════════════════════════════ */
 const Utils = {
+  toast(msg, dur) { return toast(msg, dur); },  // várias telas chamam Utils.toast; a função de verdade é a global toast()
   uuid() {
     if (crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -1050,6 +1271,7 @@ const Chat = {
     txt = txt.trim();
     if (!txt) return;
     this._addMsg('user', txt);
+    if (Secretaria.disponivel) { await this._processarSecretaria(txt); return; }
     if (this._modoRapido) { this._processarRegex(txt); return; }
     const key = localStorage.getItem('anthropic_key');
     if (key) await this._processarIA(txt, key);
@@ -1128,6 +1350,24 @@ const Chat = {
       reader.readAsDataURL(file);
     };
     input.click();
+  },
+
+  // ── Secretária (servidor): acesso a tarefas e finanças ──
+  async _processarSecretaria(txt) {
+    const chatEl = document.getElementById('chat-hist');
+    const loadDiv = document.createElement('div');
+    loadDiv.className = 'chat-msg app';
+    loadDiv.style.opacity = '0.6';
+    loadDiv.textContent = '⏳ Pensando…';
+    if (chatEl) { chatEl.appendChild(loadDiv); chatEl.scrollTop = chatEl.scrollHeight; }
+    try {
+      const r = await Telas.secretaria.enviar(txt, { silencioso: true });
+      if (loadDiv.parentNode) loadDiv.remove();
+      this._addMsg('app', Secretaria.textoPuro(r.resposta), 'ok');
+    } catch(e) {
+      if (loadDiv.parentNode) loadDiv.remove();
+      this._addMsg('app', `❌ ${e.message}`, 'err');
+    }
   },
 
   // ── IA: Claude API ────────────────────────────────────
@@ -2331,7 +2571,7 @@ const Graf = {
    ROUTER
 ═══════════════════════════════════════════════════════════ */
 const Router = {
-  telas: ['dashboard','contas','cartoes','lancamentos','investimentos','relatorios','ajuste','config'],
+  telas: ['dashboard','secretaria','tarefas','contas','cartoes','lancamentos','investimentos','relatorios','ajuste','config'],
   atual: null,
   init() {
     window.addEventListener('hashchange', () => this._navegar());
@@ -2349,7 +2589,7 @@ const Router = {
     });
     Telas[tela]?.render();
     const fab = document.getElementById('fab');
-    fab.style.display = ['dashboard','lancamentos','contas','cartoes','investimentos'].includes(tela) ? '' : 'none';
+    fab.style.display = ['dashboard','lancamentos','contas','cartoes','investimentos','tarefas'].includes(tela) ? '' : 'none';
   },
   ir(tela) { location.hash = tela; }
 };
@@ -4724,11 +4964,337 @@ Telas.ajuste = {
 /* ═══════════════════════════════════════════════════════════
    FAB  (abre modal de novo lançamento)
 ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   SECRETÁRIA (servidor): conversa, tarefas, desfazer e notificações
+   Funciona quando o app é aberto pelo servidor (/app/) e com login Google.
+═══════════════════════════════════════════════════════════ */
+const Secretaria = {
+  _base: '/secretaria/app',
+  get noServidor() { return location.pathname.startsWith('/app'); },
+  get disponivel() { return this.noServidor && Sync.logado; },
+
+  async api(metodo, caminho, corpo) {
+    const usuario = firebase.auth().currentUser;
+    if (!usuario) throw new Error('Entre com Google para falar com a secretária.');
+    const token = await usuario.getIdToken();
+    let r;
+    try {
+      r = await fetch(this._base + caminho, {
+        method: metodo,
+        headers: { 'Authorization': 'Bearer ' + token, ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+        body: corpo !== undefined ? JSON.stringify(corpo) : undefined
+      });
+    } catch(e) { throw new Error('Sem conexão com a secretária agora.'); }
+    if (!r.ok) {
+      let msg = `Erro ${r.status}`;
+      try { msg = (await r.json()).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    return r.json();
+  },
+
+  // A IA escreve com <b>, <i> etc. Só essas marcações passam; o resto vira texto.
+  desenhar(texto, destino) {
+    const doc = new DOMParser().parseFromString(`<div>${texto ?? ''}</div>`, 'text/html');
+    const PERMITIDAS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'CODE', 'BR']);
+    const copiar = (origem, alvo) => {
+      for (const n of origem.childNodes) {
+        if (n.nodeType === 3) alvo.appendChild(document.createTextNode(n.textContent));
+        else if (n.nodeType === 1) {
+          const el = PERMITIDAS.has(n.tagName) ? document.createElement(n.tagName) : document.createDocumentFragment();
+          copiar(n, el);
+          alvo.appendChild(el);
+        }
+      }
+    };
+    copiar(doc.body.firstChild, destino);
+  },
+  textoPuro(texto) { return new DOMParser().parseFromString(`<div>${texto ?? ''}</div>`, 'text/html').body.textContent; },
+
+  _chave(b64) {
+    const bruto = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(bruto, c => c.charCodeAt(0));
+  },
+  get notificacoesLigadas() {
+    return 'Notification' in window && Notification.permission === 'granted' && localStorage.getItem('ff_push_ok') === '1';
+  },
+  async ligarNotificacoes() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('este navegador não aceita notificações');
+      if (await Notification.requestPermission() !== 'granted') throw new Error('permissão negada no navegador');
+      const reg = await navigator.serviceWorker.ready;
+      const { vapid } = await this.api('GET', '/config');
+      const inscricao = await reg.pushManager.getSubscription()
+        || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this._chave(vapid) });
+      await this.api('POST', '/push', inscricao.toJSON());
+      await this.api('POST', '/push/teste');
+      localStorage.setItem('ff_push_ok', '1');
+      toast('🔔 Notificações ligadas');
+    } catch(e) {
+      toast('Não consegui ligar as notificações: ' + e.message, 3500);
+    }
+    if (Router.atual === 'secretaria') Telas.secretaria.render();
+  }
+};
+
+Telas.secretaria = {
+  _msgs: [], _carregadoEm: 0, _enviando: false,
+  ATALHOS: [['📋 Plano', '/plano'], ['💡 Adiantar', '/adiantar'], ['💰 Finanças', '/financas'], ['✅ Tarefas', '/tarefas'],
+            ['📊 Relatório', '/relatorio'], ['🌙 Fechar o dia', '/fechamento'], ['💵 Custo', '/custo']],
+
+  _aviso() {
+    if (!Secretaria.noServidor)
+      return `<div class="sec-aviso">A secretária fica no app instalado pelo endereço do servidor (<strong>…onrender.com/app/</strong>).
+              Abra por lá para conversar com ela e ver as tarefas.</div>`;
+    return `<div class="sec-aviso">Entre com a sua conta Google para falar com a secretária.
+            <div style="margin-top:12px"><button class="btn btn-prim" onclick="Sync.entrar()">Entrar com Google</button></div></div>`;
+  },
+
+  render() {
+    const el = document.getElementById('tela-secretaria');
+    if (!Secretaria.disponivel) { el.innerHTML = `<div class="sec-topo"><h1>💬 Secretária</h1></div>` + this._aviso(); return; }
+    const sino = Secretaria.notificacoesLigadas ? ''
+      : `<button class="btn btn-ghost btn-sm" onclick="Secretaria.ligarNotificacoes()">🔔 Ligar notificações</button>`;
+    el.innerHTML = `
+      <div class="sec-topo"><h1>💬 Secretária</h1><div>${sino}</div></div>
+      <div class="sec-atalhos">${this.ATALHOS.map(([rotulo, cmd]) =>
+        `<button onclick="Telas.secretaria.enviar('${cmd}')">${rotulo}</button>`).join('')}</div>
+      <div class="sec-hist" id="sec-hist"></div>
+      <div class="chat-input-row sec-entrada">
+        <textarea id="sec-txt" rows="1" placeholder="Fale com a secretária: tarefas, gastos, dúvidas…"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Telas.secretaria.enviar()}"></textarea>
+        <button class="chat-send" onclick="Telas.secretaria.enviar()">➤</button>
+      </div>`;
+    this._desenhar();
+    if (Date.now() - this._carregadoEm > 20000) this.carregar();
+  },
+
+  async carregar() {
+    if (!Secretaria.disponivel || this._enviando) return;
+    try {
+      const msgs = await Secretaria.api('GET', '/conversa');
+      const ultimaDesfazivel = this._msgs.find(m => m.desfazivel)?.id;
+      this._msgs = msgs.map(m => ({ ...m, desfazivel: m.id === ultimaDesfazivel }));
+      this._carregadoEm = Date.now();
+      this._desenhar();
+    } catch(e) { console.warn('Secretária:', e); }
+  },
+
+  _desenhar() {
+    const hist = document.getElementById('sec-hist');
+    if (!hist) return;
+    hist.innerHTML = '';
+    if (!this._msgs.length && !this._enviando) {
+      hist.innerHTML = `<div class="sec-aviso">Me conta o que você precisa fazer, o que gastou ou recebeu.
+        Eu organizo, lanço no app e te aviso das coisas na hora certa.</div>`;
+    }
+    for (const m of this._msgs) {
+      const div = document.createElement('div');
+      div.className = `sec-msg ${m.papel}${m.erro ? ' erro' : ''}`;
+      if (m.papel === 'user') div.textContent = m.texto;   // o que você digitou é sempre texto
+      else Secretaria.desenhar(m.texto, div);
+      if (m.momento) {
+        const hora = document.createElement('span');
+        hora.className = 'sec-hora';
+        hora.textContent = new Date(m.momento).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        div.appendChild(hora);
+      }
+      if (m.desfazivel) {
+        const b = document.createElement('button');
+        b.className = 'sec-desfazer';
+        b.textContent = '↩️ Desfazer';
+        b.onclick = () => this.desfazer();
+        div.appendChild(b);
+      }
+      hist.appendChild(div);
+    }
+    if (this._enviando) {
+      const d = document.createElement('div');
+      d.className = 'sec-msg assistant sec-digitando';
+      d.textContent = 'digitando…';
+      hist.appendChild(d);
+    }
+    hist.scrollTop = hist.scrollHeight;
+  },
+
+  async enviar(texto, { silencioso = false } = {}) {
+    const campo = document.getElementById('sec-txt');
+    if (texto === undefined && campo) { texto = campo.value; campo.value = ''; }
+    texto = (texto || '').trim();
+    if (!texto || this._enviando) return null;
+    this._msgs.forEach(m => m.desfazivel = false);
+    this._msgs.push({ papel: 'user', texto, momento: new Date().toISOString() });
+    this._enviando = true;
+    this._desenhar();
+    try {
+      const r = await Secretaria.api('POST', '/mensagem', { texto });
+      this._msgs.push({ id: r.id, papel: 'assistant', texto: r.resposta, momento: new Date().toISOString(), desfazivel: r.desfazivel });
+      Telas.tarefas.invalidar();
+      return r;
+    } catch(e) {
+      this._msgs.push({ papel: 'assistant', texto: '⚠️ ' + Utils.esc(e.message), erro: true });
+      if (silencioso) throw e;
+      return null;
+    } finally {
+      this._enviando = false;
+      this._desenhar();
+    }
+  },
+
+  async desfazer() {
+    try {
+      const r = await Secretaria.api('POST', '/desfazer');
+      this._msgs.forEach(m => m.desfazivel = false);
+      this._msgs.push({ papel: 'assistant', texto: '↩️ ' + Utils.esc(r.resposta), momento: new Date().toISOString() });
+      Telas.tarefas.invalidar();
+      toast('↩️ ' + r.resposta);
+    } catch(e) { toast('Não consegui desfazer: ' + e.message, 3000); }
+    this._desenhar();
+  }
+};
+
+Telas.tarefas = {
+  _dados: null,
+  invalidar() { this._dados = null; if (Router.atual === 'tarefas') this.render(); },
+
+  async render() {
+    const el = document.getElementById('tela-tarefas');
+    if (!Secretaria.disponivel) {
+      el.innerHTML = `<div class="sec-topo"><h1>✅ Tarefas</h1></div>` + Telas.secretaria._aviso();
+      return;
+    }
+    el.innerHTML = `
+      <div class="sec-topo"><h1>✅ Tarefas</h1></div>
+      <div class="tar-rapida">
+        <input id="tar-nova" placeholder="Nova tarefa para hoje… (ou toque no + para mais detalhes)"
+          onkeydown="if(event.key==='Enter'){Telas.tarefas.criarRapida()}">
+        <button class="btn btn-prim" onclick="Telas.tarefas.criarRapida()">Adicionar</button>
+      </div>
+      <div id="tar-lista"><div class="sec-aviso">Carregando…</div></div>`;
+    if (!this._dados) {
+      try { this._dados = await Secretaria.api('GET', '/tarefas'); }
+      catch(e) { document.getElementById('tar-lista').innerHTML = `<div class="sec-aviso">${Utils.esc(e.message)}</div>`; return; }
+    }
+    this._desenharLista();
+  },
+
+  _desenharLista() {
+    const lista = document.getElementById('tar-lista');
+    if (!lista) return;
+    const hoje = Utils.dataHoje();
+    const grupos = { 'Hoje': [], 'Próximos dias': [], 'Sem data': [], 'Aguardando outras pessoas': [] };
+    for (const t of this._dados || []) {
+      if (t.status === 'aguardando') grupos['Aguardando outras pessoas'].push(t);
+      else if (t.agendada_para && t.agendada_para <= hoje) grupos['Hoje'].push(t);
+      else if (t.agendada_para) grupos['Próximos dias'].push(t);
+      else grupos['Sem data'].push(t);
+    }
+    const dia = iso => iso ? Utils.formatarData(iso) : '';
+    let html = '';
+    for (const [nome, itens] of Object.entries(grupos)) {
+      if (!itens.length) continue;
+      html += `<div class="tar-grupo"><h2>${nome} (${itens.length})</h2>`;
+      for (const t of itens) {
+        const meta = [t.area === 'profissional' ? '💼' : '🏠'];
+        if (t.prioridade === 1) meta.push('<span class="alta">alta</span>');
+        if (t.agendada_para && nome !== 'Hoje') meta.push(dia(t.agendada_para));
+        if (t.hora) meta.push(t.hora);
+        if (t.prazo) meta.push('prazo ' + dia(t.prazo));
+        if (t.recorrencia) meta.push('🔁');
+        if (t.adiamentos >= 3) meta.push(`adiada ${t.adiamentos}x`);
+        html += `<div class="tar-item" onclick="Telas.tarefas.editar(${t.id})">
+          <button class="tar-check" title="Concluir" onclick="event.stopPropagation();Telas.tarefas.concluir(${t.id})"></button>
+          <div><div class="tar-titulo">${Utils.esc(t.titulo)}</div><div class="tar-meta">${meta.join(' · ')}</div></div></div>`;
+      }
+      html += '</div>';
+    }
+    lista.innerHTML = html || `<div class="sec-aviso">Nada em aberto. 🎉</div>`;
+  },
+
+  async concluir(id) {
+    try {
+      await Secretaria.api('POST', `/tarefas/${id}/concluir`);
+      this._dados = (this._dados || []).filter(t => t.id !== id);
+      this._desenharLista();
+      toast('✅ Feito!');
+      this._dados = null;
+      setTimeout(() => this.render(), 400);  // tarefas repetidas ganham a próxima
+    } catch(e) { toast('Não consegui concluir: ' + e.message, 3000); }
+  },
+
+  async criarRapida() {
+    const campo = document.getElementById('tar-nova');
+    const titulo = (campo?.value || '').trim();
+    if (!titulo) return;
+    try {
+      await Secretaria.api('POST', '/tarefas', { titulo, area: 'pessoal', agendada_para: Utils.dataHoje() });
+      campo.value = '';
+      this.invalidar();
+    } catch(e) { toast('Não consegui criar: ' + e.message, 3000); }
+  },
+
+  _form(t = {}) {
+    const op = (valor, rotulo, atual) => `<option value="${valor}"${String(atual) === String(valor) ? ' selected' : ''}>${rotulo}</option>`;
+    return `
+      <div class="form-grupo"><label>Tarefa</label><input id="tf-titulo" value="${Utils.esc(t.titulo || '')}"></div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Área</label><select id="tf-area">${op('pessoal', 'Pessoal', t.area || 'pessoal')}${op('profissional', 'Profissional', t.area)}</select></div>
+        <div class="form-grupo"><label>Prioridade</label><select id="tf-prio">${op(1, 'Alta', t.prioridade)}${op(2, 'Média', t.prioridade ?? 2)}${op(3, 'Baixa', t.prioridade)}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-grupo"><label>Fazer em</label><input id="tf-dia" type="date" value="${t.agendada_para || ''}"></div>
+        <div class="form-grupo"><label>Hora</label><input id="tf-hora" type="time" value="${t.hora || ''}"></div>
+      </div>
+      <div class="form-grupo"><label>Prazo final</label><input id="tf-prazo" type="date" value="${t.prazo || ''}"></div>
+      <div class="form-grupo"><label>Detalhes</label><textarea id="tf-det" rows="2">${Utils.esc(t.detalhes || '')}</textarea></div>`;
+  },
+  _lerForm() {
+    const v = id => document.getElementById(id).value.trim();
+    return { titulo: v('tf-titulo'), area: v('tf-area'), prioridade: parseInt(v('tf-prio')),
+             agendada_para: v('tf-dia') || null, hora: v('tf-hora') || null, prazo: v('tf-prazo') || null,
+             detalhes: v('tf-det') || null };
+  },
+
+  nova() {
+    Modal.abrir('Nova tarefa', this._form({ agendada_para: Utils.dataHoje() }), { ok: 'Criar', onOk: async () => {
+      try { await Secretaria.api('POST', '/tarefas', this._lerForm()); Modal.fechar(); this.invalidar(); }
+      catch(e) { toast(e.message, 3000); }
+    }});
+  },
+
+  editar(id) {
+    const t = (this._dados || []).find(x => x.id === id);
+    if (!t) return;
+    Modal.abrir('Editar tarefa', this._form(t) + `
+      <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="Telas.tarefas.cancelar(${id})">Apagar esta tarefa</button>`,
+      { onOk: async () => {
+        try { await Secretaria.api('PATCH', `/tarefas/${id}`, this._lerForm()); Modal.fechar(); this.invalidar(); }
+        catch(e) { toast(e.message, 3000); }
+      }});
+  },
+
+  async cancelar(id) {
+    try { await Secretaria.api('PATCH', `/tarefas/${id}`, { status: 'cancelada' }); Modal.fechar(); this.invalidar(); toast('Tarefa apagada.'); }
+    catch(e) { toast(e.message, 3000); }
+  }
+};
+
+// Volta para o app: busca o que chegou (plano, lembretes, respostas)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (Router.atual === 'secretaria') Telas.secretaria.carregar();
+  if (Router.atual === 'tarefas') Telas.tarefas.invalidar();
+});
+if ('serviceWorker' in navigator && Secretaria.noServidor) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker:', e));
+}
+
 document.getElementById('fab').addEventListener('click', () => {
   const tela = Router.atual;
   if (tela === 'contas')        { Telas.contas.novo(); return; }
   if (tela === 'cartoes')       { Telas.cartoes.novo(); return; }
   if (tela === 'investimentos') { Telas.investimentos._novoManual(); return; }
+  if (tela === 'tarefas')       { Telas.tarefas.nova(); return; }
   Telas.lancamentos.novo();
 });
 
@@ -4743,14 +5309,18 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 (async function() {
   Sync.init();
   const pulled = await Sync.pull();
-  if (!pulled) seed();
+  // Sem login não semeia: os dados de verdade estão no Firebase e chegam depois do login
+  if (!pulled && Sync.logado) seed();
   Chat.init();
   // Migração: atualiza meta de R$500 (padrão antigo) para R$900
   if (Storage.metaInvest() === 500) Storage.salvarMetaInvest(900);
-  verificarRecompensa();
-  verificarFixos();
+  // Só lança contas fixas e recompensas com os dados em dia; senão, a secretária
+  // pode ter lançado a mesma conta e ela entraria duas vezes.
+  if (pulled) { verificarRecompensa(); verificarFixos(); }
   verificarVencimentos();
   Router.init();
+
+  if (!Sync.logado) { setTimeout(() => { if (!Sync.logado) Sync.painel(); }, 600); return; }
 
   // Avisa se parece ser primeira abertura após atualização de arquivo
   const j = localStorage.getItem('ff_contas');

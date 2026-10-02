@@ -1,0 +1,17 @@
+{
+  "name": "Secretária",
+  "short_name": "Secretária",
+  "description": "Tarefas e finanças com a sua secretária",
+  "lang": "pt-BR",
+  "start_url": "./#secretaria",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F0F1A",
+  "theme_color": "#6C63FF",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

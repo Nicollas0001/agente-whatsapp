@@ -1,0 +1,22 @@
+# Configuração do Render: em render.com, "New > Blueprint" (ou o link
+# render.com/deploy?repo=https://github.com/Nicollas0001/agente-whatsapp)
+# cria o servidor sozinho e só pede os três valores marcados com sync: false.
+services:
+  - type: web
+    name: secretaria
+    runtime: python
+    plan: free
+    region: virginia
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: FIREBASE_CREDENCIAIS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DONO_EMAIL
+        sync: false
