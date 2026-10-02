@@ -14,7 +14,7 @@ from typing import Callable, Optional
 
 from google.cloud import firestore
 
-from app.secretaria import banco, repositorio as repo
+from app.secretaria import banco, diario, repositorio as repo
 
 TIPOS_CONTA = ("corrente", "poupança", "investimento", "dinheiro")
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
@@ -31,10 +31,11 @@ def carregar() -> dict:
 
 
 @firestore.transactional
-def _aplicar(transacao, ref, funcao: Callable[[dict], tuple]):
+def _aplicar(transacao, ref, funcao: Callable[[dict], tuple], tentativa: dict):
     snap = ref.get(transaction=transacao)
     dados = (snap.to_dict() or {}) if snap.exists else {}
     mudancas, resultado = funcao(dados)
+    tentativa.update(antes=dados, mudancas=mudancas)  # a última tentativa é a que foi gravada
     if mudancas:
         mudancas = {**mudancas, "rev": (dados.get("rev") or 0) + 1,
                     "updatedAt": firestore.SERVER_TIMESTAMP, "alteradoPor": "secretaria"}
@@ -54,7 +55,11 @@ def alterar(funcao: Callable[[dict], tuple]):
     A trava evita que a própria secretária dispute o documento consigo mesma;
     a transação cuida da disputa com o app (com mais tentativas que o padrão)."""
     with _gravando:
-        return _aplicar(banco.cliente().transaction(max_attempts=15), _ref(), funcao)
+        tentativa = {}
+        resultado = _aplicar(banco.cliente().transaction(max_attempts=15), _ref(), funcao, tentativa)
+    if tentativa.get("mudancas") and diario.ativo() is not None:
+        diario.ativo().anotar_financas(tentativa["antes"], tentativa["mudancas"])
+    return resultado
 
 
 # ---------- utilidades ----------

@@ -4,3 +4,4 @@ __pycache__/
 
 # /arena skill run output
 .arena/
+.pytest_cache/

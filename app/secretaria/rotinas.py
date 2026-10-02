@@ -6,13 +6,17 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from app.secretaria import config, financas, ia, telegram, repositorio as repo
+from app.secretaria import canal, config, diario, financas, ia, telegram, repositorio as repo
 
 log = logging.getLogger("secretaria")
 
 # Uma coisa de cada vez: mensagens e rotinas nunca rodam em paralelo, então a
 # ordem da conversa e os dados ficam consistentes.
 _vez = threading.RLock()
+
+
+def vez() -> threading.RLock:
+    return _vez
 
 AJUDA = f"""<b>Como falar comigo</b>
 Escreve do seu jeito, como falaria com uma pessoa:
@@ -33,6 +37,7 @@ Escreve do seu jeito, como falaria com uma pessoa:
 /financas: saldos, faturas e contas do mês
 /custo: quanto a secretária custou de IA no mês
 /fechamento: fecha o dia agora
+/desfazer: desfaz a última coisa que eu alterei
 
 Eu mando o plano às {config.HORA_PLANO:%H:%M} e faço o fechamento às {config.HORA_FECHAMENTO:%H:%M}."""
 
@@ -55,7 +60,7 @@ PEDIDO_FECHAMENTO = """{origem}: faça o fechamento do dia.
 
 PEDIDO_ADIANTAR = """PEDIDO DA PESSOA (/adiantar): o que ela pode fazer agora que adianta tarefas futuras. Siga <pensar_a_frente>. Leve em conta a hora atual e o que é viável agora (à noite, coisas de casa ou do celular). No máximo 3 sugestões, da melhor para a pior. Vale também o lado financeiro (separar o dinheiro de uma conta que vence, cancelar uma assinatura que ela quase não usa, fazer o aporte do mês). Se descobrir uma dependência entre tarefas que não estava registrada, registre com atualizar_tarefa (depende_de)."""
 
-PEDIDO_BOAS_VINDAS = f"""PEDIDO DO SISTEMA: a pessoa acabou de mandar /start. Apresente-se em 2 ou 3 linhas: você guarda as tarefas pessoais e profissionais dela e cuida das finanças (gastos, entradas, contas do mês, cartões e investimentos, nos mesmos dados do app dela), manda o plano do dia às {config.HORA_PLANO:%H:%M}, faz o fechamento às {config.HORA_FECHAMENTO:%H:%M}, faz relatório quando ela pedir e diz o que dá pra adiantar (/adiantar). Depois faça no máximo 3 perguntas para conhecer a rotina: como ela quer ser chamada, horário de trabalho e compromissos fixos, e qual conta ou cartão ela mais usa no dia a dia. Não pergunte o que já está em "O QUE VOCÊ JÁ SABE"."""
+PEDIDO_BOAS_VINDAS = f"""PEDIDO DO SISTEMA: a pessoa acabou de começar a usar você (/start). Apresente-se em 2 ou 3 linhas: você guarda as tarefas pessoais e profissionais dela e cuida das finanças (gastos, entradas, contas do mês, cartões e investimentos, nos mesmos dados do app dela), manda o plano do dia às {config.HORA_PLANO:%H:%M}, faz o fechamento às {config.HORA_FECHAMENTO:%H:%M}, faz relatório quando ela pedir e diz o que dá pra adiantar (/adiantar). Depois faça no máximo 3 perguntas para conhecer a rotina: como ela quer ser chamada, horário de trabalho e compromissos fixos, e qual conta ou cartão ela mais usa no dia a dia. Não pergunte o que já está em "O QUE VOCÊ JÁ SABE"."""
 
 
 def _periodo_relatorio(argumento: str, hoje) -> tuple:
@@ -91,13 +96,9 @@ def _montar_pedido(conteudo: str, ate_mensagem_id=None) -> str:
 {conteudo}"""
 
 
-def _responder_e_enviar(conteudo: str, planejamento: bool = False, ate_mensagem_id=None) -> str:
-    pedido = _montar_pedido(conteudo, ate_mensagem_id)
-    with telegram.Digitando(config.TELEGRAM_OWNER_ID):
-        resposta = ia.responder(pedido, planejamento)
-    telegram.enviar(config.TELEGRAM_OWNER_ID, resposta)
-    repo.salvar_mensagem("assistant", resposta)
-    return resposta
+def _gerar(conteudo: str, planejamento: bool = False, ate_mensagem_id=None) -> str:
+    """Pede a resposta à IA (com retrato e conversa recente). Não entrega nem guarda."""
+    return ia.responder(_montar_pedido(conteudo, ate_mensagem_id), planejamento)
 
 
 def _lista_tarefas() -> str:
@@ -152,34 +153,41 @@ def _texto_custo() -> str:
             + "\n<i>Estimativa pelos tokens usados; o valor oficial está no console da Anthropic.</i>")
 
 
-def _tratar_comando(texto: str, mensagem_id: int) -> None:
+def responder(texto: str, mensagem_id: int) -> str:
+    """Resposta para uma mensagem da pessoa (comando ou conversa). Não entrega nem guarda."""
+    if not texto.startswith("/"):
+        return _gerar(f"Mensagem da pessoa:\n{texto}", ate_mensagem_id=mensagem_id)
     comando, _, argumento = texto.strip().partition(" ")
     comando = comando.lower().split("@")[0]
     if comando in ("/ajuda", "/help"):
-        telegram.enviar(config.TELEGRAM_OWNER_ID, AJUDA)
-    elif comando == "/tarefas":
-        telegram.enviar(config.TELEGRAM_OWNER_ID, _lista_tarefas())
-    elif comando in ("/financas", "/finanças", "/saldo"):
-        telegram.enviar(config.TELEGRAM_OWNER_ID, financas.resumo_telegram())
-    elif comando == "/custo":
-        telegram.enviar(config.TELEGRAM_OWNER_ID, _texto_custo())
-    elif comando == "/start":
-        _responder_e_enviar(PEDIDO_BOAS_VINDAS, ate_mensagem_id=mensagem_id)
-    elif comando == "/plano":
+        return AJUDA
+    if comando == "/tarefas":
+        return _lista_tarefas()
+    if comando in ("/financas", "/finanças", "/saldo"):
+        return financas.resumo_telegram()
+    if comando == "/custo":
+        return _texto_custo()
+    if comando == "/desfazer":
+        return diario.desfazer_ultima()
+    if comando == "/start":
+        return _gerar(PEDIDO_BOAS_VINDAS, ate_mensagem_id=mensagem_id)
+    if comando == "/plano":
         repo.rolar_atrasadas()
-        _responder_e_enviar(PEDIDO_PLANO.format(origem="PEDIDO DA PESSOA (/plano)"), True, mensagem_id)
+        resposta = _gerar(PEDIDO_PLANO.format(origem="PEDIDO DA PESSOA (/plano)"), True, mensagem_id)
         repo.estado_set(f"plano:{repo.hoje()}", "pedido")
-    elif comando == "/fechamento":
-        _responder_e_enviar(PEDIDO_FECHAMENTO.format(origem="PEDIDO DA PESSOA (/fechamento)"), True, mensagem_id)
+        return resposta
+    if comando == "/fechamento":
+        resposta = _gerar(PEDIDO_FECHAMENTO.format(origem="PEDIDO DA PESSOA (/fechamento)"), True, mensagem_id)
         repo.estado_set(f"fechamento:{repo.hoje()}", "pedido")
-    elif comando == "/adiantar":
+        return resposta
+    if comando == "/adiantar":
         extra = f"\nO que ela disse junto: {argumento}" if argumento else ""
-        _responder_e_enviar(PEDIDO_ADIANTAR + extra, True, mensagem_id)
-    elif comando in ("/relatorio", "/relatório"):
+        return _gerar(PEDIDO_ADIANTAR + extra, True, mensagem_id)
+    if comando in ("/relatorio", "/relatório"):
         inicio, fim, periodo = _periodo_relatorio(argumento, repo.hoje())
         registros = repo.formatar_registros(repo.registros_periodo(inicio, fim))
         movimento = financas.consultar(inicio.isoformat(), fim.isoformat(), limite=80)
-        _responder_e_enviar(f"""PEDIDO DA PESSOA (/relatorio): relatório do que ela fez e gastou em {periodo}.
+        return _gerar(f"""PEDIDO DA PESSOA (/relatorio): relatório do que ela fez e gastou em {periodo}.
 Comece com um resumo de 1 ou 2 linhas (volume e foco principal). Depois agrupe as atividades por área (profissional e pessoal) e por tema, não por hora, destacando entregas importantes. Depois o dinheiro: quanto entrou, quanto saiu, as 3 maiores categorias de gasto, compras que chamam atenção e como estão as metas e o aporte do mês. No fim, o que ficou pendente ou atrasado no período (veja o retrato) e uma observação honesta sobre o padrão, se houver algo útil (muito apagando incêndio, nada pessoal, algo sendo empurrado, gasto subindo). Seja fiel aos dados, sem inventar.
 
 <atividades>
@@ -189,8 +197,29 @@ Comece com um resumo de 1 ou 2 linhas (volume e foco principal). Depois agrupe a
 <lancamentos_financeiros>
 {movimento}
 </lancamentos_financeiros>""", True, mensagem_id)
-    else:
-        _responder_e_enviar(f"Mensagem da pessoa:\n{texto}", ate_mensagem_id=mensagem_id)
+    return _gerar(f"Mensagem da pessoa:\n{texto}", ate_mensagem_id=mensagem_id)
+
+
+def responder_app(texto: str) -> dict:
+    """Mensagem digitada no app: responde na hora (a resposta volta na própria requisição)."""
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValueError("mensagem vazia")
+    with _vez:
+        mensagem_id = repo.salvar_mensagem("user", texto)
+        if not repo.estado_get("iniciado"):
+            repo.estado_set("iniciado", repo.agora().isoformat())
+        with diario.registrando(texto) as registro:
+            try:
+                resposta = responder(texto, mensagem_id)
+            except Exception as erro:  # a pessoa precisa de uma resposta, não de um "Erro 500"
+                log.exception("Falha ao responder pelo app")
+                resposta = ("Tive um problema técnico e não consegui terminar isso agora "
+                            f"({type(erro).__name__}). Tenta de novo daqui a pouco?")
+                if not registro.vazio():
+                    resposta += " O que eu já tinha alterado pode ser desfeito no botão abaixo."
+        resposta_id = repo.salvar_mensagem("assistant", resposta)
+    return {"resposta": resposta, "id": resposta_id, "desfazivel": not registro.vazio()}
 
 
 def processar_pendentes() -> None:
@@ -215,12 +244,15 @@ def processar_pendentes() -> None:
         for grupo in grupos:
             ids = [m.id for m in grupo]
             try:
-                if len(grupo) == 1 and grupo[0].texto.startswith("/"):
-                    _tratar_comando(grupo[0].texto, grupo[0].id)
-                else:
-                    textos = "\n".join(f"[{m.momento:%H:%M}] {m.texto}" for m in grupo)
-                    rotulo = "Mensagem da pessoa" if len(grupo) == 1 else "Mensagens da pessoa (mandadas em sequência)"
-                    _responder_e_enviar(f"{rotulo}:\n{textos}", ate_mensagem_id=ids[0])
+                with telegram.Digitando(config.TELEGRAM_OWNER_ID), diario.registrando(grupo[-1].texto):
+                    if len(grupo) == 1 and grupo[0].texto.startswith("/"):
+                        resposta = responder(grupo[0].texto, grupo[0].id)
+                    else:
+                        textos = "\n".join(f"[{m.momento:%H:%M}] {m.texto}" for m in grupo)
+                        rotulo = "Mensagem da pessoa" if len(grupo) == 1 else "Mensagens da pessoa (mandadas em sequência)"
+                        resposta = _gerar(f"{rotulo}:\n{textos}", ate_mensagem_id=ids[0])
+                repo.salvar_mensagem("assistant", resposta)
+                telegram.enviar(config.TELEGRAM_OWNER_ID, resposta)
             except Exception as erro:  # fronteira do job: a pessoa precisa saber que falhou
                 log.exception("Falha ao responder")
                 aviso = ("Tive um problema técnico e não consegui processar isso agora "
@@ -247,7 +279,9 @@ def _rotina_do_dia(chave: str, pedido: str) -> None:
         return
     repo.estado_set(tentativas_chave, str(tentativas + 1))
     try:
-        _responder_e_enviar(pedido, planejamento=True)
+        with diario.registrando(f"rotina {chave}"):
+            texto = _gerar(pedido, planejamento=True)
+        canal.entregar(texto)
         repo.estado_set(chave, "enviado")
     except Exception:
         log.exception("Falha na rotina %s", chave)
@@ -256,7 +290,7 @@ def _rotina_do_dia(chave: str, pedido: str) -> None:
 def tick() -> dict:
     """Roda o que estiver na hora. Pode ser chamado quantas vezes quiser."""
     feito = {"lembretes": 0, "plano": False, "fechamento": False}
-    if not config.TELEGRAM_OWNER_ID:
+    if not canal.tem_destino():
         return feito
     with _vez:
         agora = repo.agora()
@@ -265,10 +299,9 @@ def tick() -> dict:
         for lembrete in repo.lembretes_vencidos():
             atraso = agora - lembrete.quando
             nota = f"\n<i>(era pra {lembrete.quando:%H:%M})</i>" if atraso > timedelta(minutes=20) else ""
-            if telegram.enviar(config.TELEGRAM_OWNER_ID, f"⏰ {html.escape(lembrete.texto)}{nota}"):
-                repo.marcar_lembrete_enviado(lembrete.id)
-                repo.salvar_mensagem("assistant", f"⏰ {lembrete.texto}")
-                feito["lembretes"] += 1
+            canal.entregar(f"⏰ {html.escape(lembrete.texto)}{nota}")
+            repo.marcar_lembrete_enviado(lembrete.id)
+            feito["lembretes"] += 1
 
         if repo.estado_get("rolagem") != hoje.isoformat():
             repo.rolar_atrasadas(hoje)

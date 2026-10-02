@@ -67,6 +67,7 @@ def status():
         "dono_configurado": bool(config.TELEGRAM_OWNER_ID),
         "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
         "firebase": banco.configurado(),
+        "dono_email": bool(config.DONO_EMAIL),
         "url_publica": config.PUBLIC_URL or None,
         "modelo_dia_a_dia": config.MODELO,
         "modelo_planejamento": config.MODELO_PLANEJAMENTO,

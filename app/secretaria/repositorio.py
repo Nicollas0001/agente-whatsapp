@@ -14,7 +14,7 @@ from typing import Optional
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from app.secretaria import banco, config, recorrencia
+from app.secretaria import banco, config, diario, recorrencia
 
 DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
                "sexta-feira", "sábado", "domingo"]
@@ -25,6 +25,18 @@ PRIORIDADES = {1: "alta", 2: "média", 3: "baixa"}
 
 def _col(nome: str):
     return banco.cliente().collection(f"sec_{nome}")
+
+
+def _anotar(nome: str, doc_id, novo: bool = False) -> None:
+    """Guarda no diário (se a IA estiver agindo) como o documento estava antes de mudar."""
+    atual = diario.ativo()
+    if atual is None or (f"sec_{nome}", str(doc_id)) in atual.docs:
+        return
+    if novo:
+        atual.anotar_doc(f"sec_{nome}", doc_id, None)
+        return
+    snap = _col(nome).document(str(doc_id)).get()
+    atual.anotar_doc(f"sec_{nome}", doc_id, snap.to_dict() if snap.exists else None)
 
 
 def agora() -> datetime:
@@ -222,6 +234,7 @@ def criar_tarefa(dados: dict) -> int:
     if campos.get("recorrencia") and not campos.get("agendada_para"):
         campos["agendada_para"] = recorrencia.proxima_a_partir_de(campos["recorrencia"], hoje())
     tarefa_id = proximo_id("tarefas")
+    _anotar("tarefas", tarefa_id, novo=True)
     _col("tarefas").document(str(tarefa_id)).set(_para_banco({
         **{c: None for c in CAMPOS_TAREFA}, **campos,
         "adiamentos": 0, "criada_em": agora(), "concluida_em": None,
@@ -250,6 +263,7 @@ def atualizar_tarefa(tarefa_id: int, dados: dict) -> None:
         campos["concluida_em"] = agora()
     elif campos.get("status") in STATUS_ABERTOS:
         campos["concluida_em"] = None  # reaberta
+    _anotar("tarefas", int(tarefa_id))
     _col("tarefas").document(str(int(tarefa_id))).update(_para_banco(campos))
 
 
@@ -260,6 +274,7 @@ def concluir_tarefa(tarefa_id: int, observacao: str = "", momento: Optional[date
     if t.status == "feita":
         return f"#{tarefa_id} já estava concluída"
     momento = momento or agora()
+    _anotar("tarefas", t.id)
     _col("tarefas").document(str(t.id)).update({"status": "feita", "concluida_em": _iso(momento)})
     registrar(t.titulo + (f" — {observacao}" if observacao else ""), t.area, t.id, momento)
     resposta = f"#{tarefa_id} concluída"
@@ -323,6 +338,7 @@ def rolar_atrasadas(ref: Optional[date] = None) -> int:
     ref = ref or hoje()
     atrasadas = [t for t in tarefas_abertas() if t.agendada_para and t.agendada_para < ref]
     for t in atrasadas:
+        _anotar("tarefas", t.id)
         doc = _col("tarefas").document(str(t.id))
         if t.recorrencia and not t.prazo:
             nova = recorrencia.proxima_a_partir_de(t.recorrencia, ref) or ref
@@ -338,9 +354,9 @@ def registrar(texto: str, area: Optional[str] = None, tarefa_id: Optional[int] =
               momento: Optional[datetime] = None) -> str:
     if area:
         area = "profissional" if str(area).lower().startswith("prof") else "pessoal"
-    _, ref = _col("registros").add({
-        "momento": _iso(momento or agora()), "texto": texto.strip(), "area": area, "tarefa_id": tarefa_id,
-    })
+    ref = _col("registros").document()
+    _anotar("registros", ref.id, novo=True)
+    ref.set({"momento": _iso(momento or agora()), "texto": texto.strip(), "area": area, "tarefa_id": tarefa_id})
     return ref.id
 
 
@@ -378,6 +394,7 @@ def _lembrete(snap) -> SimpleNamespace:
 
 def criar_lembrete(quando, texto: str) -> int:
     lembrete_id = proximo_id("lembretes")
+    _anotar("lembretes", lembrete_id, novo=True)
     _col("lembretes").document(str(lembrete_id)).set({
         "quando": _iso(ler_momento(quando)), "texto": texto.strip(), "enviado": False, "criado_em": _iso(agora()),
     })
@@ -394,6 +411,7 @@ def cancelar_lembrete(lembrete_id: int) -> bool:
     snap = doc.get()
     if not snap.exists or snap.to_dict().get("enviado"):
         return False
+    _anotar("lembretes", int(lembrete_id))
     doc.delete()
     return True
 
@@ -415,6 +433,7 @@ def marcar_lembrete_enviado(lembrete_id: int) -> None:
 
 def salvar_memoria(fato: str) -> int:
     memoria_id = proximo_id("memorias")
+    _anotar("memorias", memoria_id, novo=True)
     _col("memorias").document(str(memoria_id)).set({"fato": fato.strip(), "criada_em": _iso(agora())})
     return memoria_id
 
@@ -423,6 +442,7 @@ def apagar_memoria(memoria_id: int) -> bool:
     doc = _col("memorias").document(str(int(memoria_id)))
     if not doc.get().exists:
         return False
+    _anotar("memorias", int(memoria_id))
     doc.delete()
     return True
 

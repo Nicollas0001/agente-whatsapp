@@ -37,7 +37,7 @@ def _api(metodo: str, **dados) -> dict:
         return {"ok": False, "description": str(erro)}
 
 
-def _texto_puro(texto_html: str) -> str:
+def texto_puro(texto_html: str) -> str:
     return html.unescape(re.sub(r"</?(b|i|u|s|code|pre|a)(\s[^>]*)?>", "", texto_html))
 
 
@@ -61,7 +61,7 @@ def enviar(chat_id, texto: str) -> bool:
         r = _api("sendMessage", chat_id=chat_id, text=parte, parse_mode="HTML",
                  link_preview_options={"is_disabled": True})
         if not r.get("ok"):
-            r = _api("sendMessage", chat_id=chat_id, text=_texto_puro(parte),
+            r = _api("sendMessage", chat_id=chat_id, text=texto_puro(parte),
                      link_preview_options={"is_disabled": True})
         ok = ok and bool(r.get("ok"))
         if not r.get("ok"):

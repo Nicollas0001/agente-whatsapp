@@ -4,7 +4,7 @@ import logging
 
 import anthropic
 
-from app.secretaria import config, financas, repositorio as repo
+from app.secretaria import config, diario, financas, repositorio as repo
 
 log = logging.getLogger("secretaria.ia")
 
@@ -12,7 +12,7 @@ log = logging.getLogger("secretaria.ia")
 # de segurança recusa um pedido por engano (evita a secretária "travar").
 _SUPORTA_FALLBACK = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5")
 
-SISTEMA = f"""Você é a secretária pessoal de uma pessoa ocupada que concilia vida pessoal e profissional. Vocês conversam pelo Telegram. Seu trabalho: guardar tudo o que ela precisa fazer, dizer o que fazer a cada dia, anotar o que ela vai fazendo, cuidar do dinheiro dela (gastos, entradas, contas do mês, cartões e investimentos) e ajudar a pensar à frente.
+SISTEMA = f"""Você é a secretária pessoal de uma pessoa ocupada que concilia vida pessoal e profissional. Vocês conversam pelo app dela (às vezes pelo Telegram). Seu trabalho: guardar tudo o que ela precisa fazer, dizer o que fazer a cada dia, anotar o que ela vai fazendo, cuidar do dinheiro dela (gastos, entradas, contas do mês, cartões e investimentos) e ajudar a pensar à frente.
 
 <jeito>
 - Fale como uma secretária experiente e de confiança: português do Brasil, natural, frases curtas, tom de conversa. Nada de linguagem corporativa e nada de bajulação ("ótima pergunta", "que incrível"). Elogio só quando houver motivo concreto, e curto.
@@ -23,6 +23,7 @@ SISTEMA = f"""Você é a secretária pessoal de uma pessoa ocupada que concilia 
 
 <como_trabalhar>
 - Todo pedido vem com um RETRATO atualizado: data e hora, tarefas abertas com #id, o que já foi feito hoje, lembretes, o que você sabe sobre a pessoa e as finanças. Confie nele. Use buscar_tarefas e buscar_registros só para o que não está ali (tarefas concluídas, histórico antigo).
+- Você tem acesso total: crie, altere, conclua e apague tarefas e lançamentos direto quando ela pedir, sem pedir confirmação, e diga numa linha o que fez. Tudo o que você faz pode ser desfeito (botão Desfazer no app). Se ela disser "desfaz", "não era isso" ou "volta", use desfazer_ultima_acao.
 - Registre com as ferramentas ANTES de confirmar. Nunca diga "anotei" sem ter chamado a ferramenta. Se forem várias coisas, faça todas as chamadas no mesmo turno.
 - Quando a pessoa contar que fez algo: se corresponde a uma tarefa aberta, use concluir_tarefas. Se não corresponde, use registrar_feito. Se ela fez só uma parte, registre o progresso com registrar_feito (com tarefa_id) e ajuste a tarefa, sem concluir.
 - Ao criar tarefas, preencha o que der para inferir: área (pessoal ou profissional), prazo, dia para fazer, esforço estimado, contexto (onde ou com o quê: rua, banco, computador, telefone, casa, escritório...), dependências entre tarefas e repetição. Sem prazo dito, não invente prazo; pode sugerir um dia para fazer.
@@ -266,6 +267,11 @@ FERRAMENTAS += [
         },
     },
     {
+        "name": "desfazer_ultima_acao",
+        "description": "Desfaz a última alteração que você fez (tarefas, lembretes, memória e finanças). Chamar de novo desfaz a anterior.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "configurar_financas",
         "description": "Metas de gasto por categoria e de investimento por mês, e cadastro de contas, cartões e categorias. Também corrige saldo de conta e limite de cartão.",
         "input_schema": {
@@ -369,6 +375,9 @@ def executar_ferramenta(nome: str, entrada: dict) -> str:
 
     if nome == "contas_fixas":
         return financas.contas_fixas(entrada["acao"], {k: v for k, v in entrada.items() if k != "acao"})
+
+    if nome == "desfazer_ultima_acao":
+        return diario.desfazer_ultima()
 
     if nome == "configurar_financas":
         return financas.configurar(entrada["acao"], {k: v for k, v in entrada.items() if k != "acao"})

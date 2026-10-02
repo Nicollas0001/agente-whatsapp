@@ -142,3 +142,87 @@ def test_app_e_secretaria_no_mesmo_dado(secretaria, pagina):
     erro = pagina.evaluate("""() => firebase.firestore().collection('sec_tarefas').get()
         .then(() => 'leu').catch(e => e.code)""")
     assert erro == "permission-denied"
+
+
+# ---------- o app instalado, servido pelo próprio servidor em /app/ ----------
+
+@pytest.fixture
+def servidor_api(monkeypatch, secretaria):
+    import uvicorn
+    from app.secretaria import config, ia, financas as fin_mod
+
+    monkeypatch.setenv("FIREBASE_PROJECT_ID", PROJETO)
+    monkeypatch.setattr(config, "DONO_EMAIL", "dono@teste.com")
+
+    def ia_falsa(pedido, planejamento=False):
+        if "gastei 45" in pedido:
+            fin_mod.lancar([{"tipo": "despesa", "valor": 45, "descricao": "iFood", "categoria": "Alimentação",
+                             "cartao": "Nubank"}])
+            return 'Lancei <b>R$ 45,00</b> no Nubank. <img src=x onerror="window.__xss=1"><script>window.__xss=2</script>'
+        return "Oi! Em que posso ajudar?"
+
+    monkeypatch.setattr(ia, "responder", ia_falsa)
+    from app.main import app
+    servidor = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"))
+    thread = threading.Thread(target=servidor.run, daemon=True)
+    thread.start()
+    _esperar(lambda: servidor.started, descricao="subir o servidor")
+    porta = servidor.servers[0].sockets[0].getsockname()[1]
+    yield f"http://127.0.0.1:{porta}"
+    servidor.should_exit = True
+    thread.join(5)
+
+
+def test_app_instalado_conversa_desfaz_e_tarefas(servidor_api, secretaria):
+    sdk = Path(os.environ["FIREBASE_SDK_DIR"])
+    with sync_playwright() as p:
+        navegador = p.chromium.launch(executable_path=os.getenv("CHROMIUM_PATH") or None)
+        pagina = navegador.new_page()
+        pagina.route("https://www.gstatic.com/firebasejs/**",
+                     lambda rota: rota.fulfill(path=str(sdk / rota.request.url.rsplit("/", 1)[1]),
+                                               content_type="application/javascript"))
+        pagina.goto(f"{servidor_api}/app/?emulador#secretaria")
+
+        # é um PWA instalável: manifesto e service worker no ar
+        assert pagina.evaluate("fetch('manifest.webmanifest').then(r => r.json()).then(m => m.display)") == "standalone"
+        assert pagina.evaluate("navigator.serviceWorker.ready.then(r => r.active ? 'ativo' : 'nao')") == "ativo"
+
+        # outra conta: a API recusa
+        _entrar(pagina, "intruso@teste.com")
+        _esperar(lambda: pagina.locator("#sec-txt").count() == 1, descricao="tela da secretária")
+        pagina.fill("#sec-txt", "oi")
+        pagina.press("#sec-txt", "Enter")
+        _esperar(lambda: "não tem acesso" in pagina.text_content("#sec-hist"), descricao="recusar outra conta")
+        pagina.evaluate("firebase.auth().signOut()")
+
+        # o dono conversa; a IA lança um gasto que aparece no app na hora
+        _entrar(pagina, "dono@teste.com")
+        _esperar(lambda: pagina.locator("#sec-txt").count() == 1 and "Salário Marista" in _descricoes_app(pagina),
+                 descricao="logar e baixar dados")
+        pagina.fill("#sec-txt", "gastei 45 no ifood no nubank")
+        pagina.press("#sec-txt", "Enter")
+        _esperar(lambda: pagina.locator(".sec-desfazer").count() == 1, descricao="resposta com desfazer")
+        resposta = pagina.locator(".sec-msg.assistant").last
+        assert resposta.locator("b").inner_text() == "R$ 45,00"
+        assert resposta.locator("img, script").count() == 0 and pagina.evaluate("window.__xss") is None
+        _esperar(lambda: "iFood" in _descricoes_app(pagina), descricao="gasto chegar no app")
+
+        # desfazer tira o gasto do Firebase e do app
+        pagina.click(".sec-desfazer")
+        _esperar(lambda: "iFood" not in _descricoes_firestore(secretaria), descricao="desfazer no Firebase")
+        _esperar(lambda: "iFood" not in _descricoes_app(pagina), descricao="desfazer no app")
+        assert "Desfeito" in pagina.text_content("#sec-hist")
+
+        # histórico continua lá depois de recarregar
+        pagina.reload()
+        _esperar(lambda: "gastei 45 no ifood" in (pagina.text_content("#sec-hist") or ""), descricao="histórico")
+
+        # tarefas na mão
+        pagina.goto(f"{servidor_api}/app/?emulador#tarefas")
+        _esperar(lambda: pagina.locator("#tar-nova").count() == 1, descricao="tela de tarefas")
+        pagina.fill("#tar-nova", "Comprar pão")
+        pagina.press("#tar-nova", "Enter")
+        _esperar(lambda: "Comprar pão" in (pagina.text_content("#tar-lista") or ""), descricao="criar tarefa")
+        pagina.click(".tar-check")
+        _esperar(lambda: "Comprar pão" not in (pagina.text_content("#tar-lista") or ""), descricao="concluir tarefa")
+        navegador.close()

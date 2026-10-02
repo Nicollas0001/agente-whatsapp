@@ -24,6 +24,9 @@ TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET") or (
     if TELEGRAM_BOT_TOKEN else ""
 )
 
+# Conta Google que pode usar o app (a mesma das regras do Firestore).
+DONO_EMAIL = os.getenv("DONO_EMAIL", "").strip().lower()
+
 # Se definido, /secretaria/tick exige ?chave=<CRON_SECRET>.
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 
