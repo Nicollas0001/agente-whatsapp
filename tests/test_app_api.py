@@ -94,6 +94,49 @@ def test_falha_da_api_diz_o_motivo(cliente, monkeypatch, classe, status, mensage
     corpo = cliente.post("/secretaria/app/mensagem", json={"texto": "oi"}).json()
     assert esperado in corpo["resposta"]
 
+def test_chave_da_ia_pelo_app(cliente, monkeypatch):
+    testadas = []
+
+    def testar(valor):
+        testadas.append(valor)
+        if valor != "sk-ant-api03-boa":
+            raise _erro_api("AuthenticationError", 401, "invalid x-api-key")
+
+    monkeypatch.setattr(ia, "testar_chave", testar)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-do-render")
+    monkeypatch.setattr(ia, "_cliente", None)
+    assert ia._cliente_claude().api_key == "sk-ant-api03-do-render"
+
+    assert cliente.post("/secretaria/app/chave", json={"chave": "minha senha"}).status_code == 400
+    r = cliente.post("/secretaria/app/chave", json={"chave": "sk-ant-api03-ruim"})
+    assert r.status_code == 400 and "não reconheceu" in r.json()["detail"]
+    assert repo.estado_get("anthropic_chave") is None                      # chave recusada não fica guardada
+
+    assert cliente.post("/secretaria/app/chave", json={"chave": " sk-ant-api03-boa\n"}).json() == {"ok": True}
+    assert testadas[-1] == "sk-ant-api03-boa"
+    assert ia._cliente_claude().api_key == "sk-ant-api03-boa"              # a do app vale mais que a do servidor
+    assert cliente.get("/secretaria/app/config").json()["chave_ia"] is True
+    assert cliente.post("/secretaria/app/chave", json={"chave": "sk-ant-x"},
+                        headers={"Authorization": "Bearer intruso"}).status_code == 403
+
+
+def test_sem_chave_diz_onde_colocar(cliente, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(ia, "_cliente", None)
+    corpo = cliente.post("/secretaria/app/mensagem", json={"texto": "oi"}).json()
+    assert "falta a chave da IA" in corpo["resposta"] and "Config" in corpo["resposta"]
+
+@pytest.mark.sem_banco
+def test_status_responde_mesmo_com_banco_fora(monkeypatch):
+    from app.secretaria import rotas
+
+    def fora_do_ar(chave):
+        raise RuntimeError("Firestore fora do ar")
+
+    monkeypatch.setattr(repo, "estado_get", fora_do_ar)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-do-render")
+    assert rotas.status()["anthropic_key"] is True
+
 def test_comandos_sem_ia_pelo_app(cliente):
     r = cliente.post("/secretaria/app/mensagem", json={"texto": "/tarefas"}).json()
     assert "Nada em aberto" in r["resposta"] and r["desfazivel"] is False

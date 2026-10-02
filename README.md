@@ -52,20 +52,21 @@ A estimativa supõe umas 10 a 15 mensagens por dia. O botão **Custo** mostra o 
 1. **Firebase** ([console](https://console.firebase.google.com), projeto `financas-pessoal-1ca66`):
    1. *Authentication → Método de login*: ative o **Google**.
    2. *Configurações do projeto → Contas de serviço → Gerar nova chave privada*: baixa um arquivo JSON. Ele dá acesso total ao banco; não coloque no repositório nem mande para ninguém.
-2. **Chave do Claude:** em [console.anthropic.com](https://console.anthropic.com), crie uma API key, coloque créditos e defina o limite mensal.
+2. **Chave do Claude:** em [platform.claude.com](https://platform.claude.com), coloque créditos (com a recarga automática desligada) e crie uma chave em *Chaves de API → Criar chave* com **Escopo: Espaço de trabalho padrão** e **Expira: Nunca**. Chave com escopo "Organização" é recusada.
 3. **Render:** abra [render.com/deploy?repo=https://github.com/Nicollas0001/agente-whatsapp](https://render.com/deploy?repo=https://github.com/Nicollas0001/agente-whatsapp), entre com o GitHub e confirme. O [`render.yaml`](render.yaml) cria o servidor sozinho e só pede três valores:
 
    | Variável | Valor |
    |---|---|
    | `FIREBASE_CREDENCIAIS` | o conteúdo inteiro do JSON do passo 1.2 |
-   | `ANTHROPIC_API_KEY` | chave do passo 2 |
+   | `ANTHROPIC_API_KEY` | chave do passo 2 (ou deixe vazio e cole a chave depois no app, em *Config → Assistente com IA*) |
    | `DONO_EMAIL` | o seu e-mail do Google. Só essa conta usa o app |
 
 4. **Domínio:** no Firebase, *Authentication → Configurações → Domínios autorizados*, adicione o endereço que o Render deu (ex.: `secretaria-xxxx.onrender.com`).
 5. **Despertador:** já está pronto em [`.github/workflows/secretaria.yml`](.github/workflows/secretaria.yml). O GitHub chama o servidor a cada 10 minutos, de graça, para ele não dormir e para disparar plano, fechamento e lembretes. Se o repositório ficar 60 dias sem nenhum commit, o GitHub pausa esse agendamento e manda um e-mail; é só reativar em *Actions*.
 6. **Instalar no tablet:** abra `https://SEU-APP.onrender.com/app/` no Chrome, entre com Google, toque no menu ⋮ e em **Instalar app** (ou **Adicionar à tela inicial**). Depois, na tela **Secretária**, toque em **🔔 Ligar notificações** e aceite. Deve chegar uma notificação de teste.
 7. **Só depois do passo 6**, feche o banco: *Firestore → Regras*, cole o conteúdo de [`firestore.rules`](firestore.rules) trocando `SEU_EMAIL@gmail.com` pelo seu e-mail e publique. Antes disso, qualquer pessoa com o endereço do projeto consegue ler e apagar seus dados financeiros.
-8. **Conferir:** `https://SEU-APP.onrender.com/secretaria/status` deve mostrar `firebase`, `anthropic_key` e `dono_email` como `true`.
+8. **Trocar a chave do Claude depois:** no próprio app, *Config → Assistente com IA → Salvar*. O servidor confere com a Anthropic antes de aceitar e a chave fica guardada no Firestore, numa coleção que só o servidor lê. Ela vale mais que a `ANTHROPIC_API_KEY` do Render.
+9. **Conferir:** `https://SEU-APP.onrender.com/secretaria/status` deve mostrar `firebase`, `anthropic_key` e `dono_email` como `true`.
 
 O `financas.html` aberto em outro endereço (GitHub Pages, por exemplo) continua funcionando para as finanças, depois que esse domínio também for autorizado no passo 4. A Secretária e as Tarefas só aparecem no endereço do servidor.
 

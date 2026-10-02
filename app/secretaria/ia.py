@@ -1,6 +1,7 @@
 """O cérebro da secretária: prompt, ferramentas e o laço de conversa com o Claude."""
 import json
 import logging
+import os
 
 import anthropic
 
@@ -385,13 +386,38 @@ def executar_ferramenta(nome: str, entrada: dict) -> str:
     raise ValueError(f"ferramenta desconhecida: {nome}")
 
 
+class SemChave(Exception):
+    """Nenhuma chave da Anthropic configurada (nem no app, nem no servidor)."""
+
+
+def chave() -> str:
+    """A chave posta pelo app (Config) vale mais que a variável do servidor."""
+    try:
+        do_app = repo.estado_get("anthropic_chave")
+    except Exception:  # banco fora do ar: segue com a do servidor
+        log.warning("Não consegui ler a chave guardada pelo app", exc_info=True)
+        do_app = None
+    return (do_app or os.getenv("ANTHROPIC_API_KEY") or "").strip()
+
+
+def testar_chave(valor: str) -> None:
+    """Confere com a Anthropic se a chave funciona para a secretária; contar tokens não gasta crédito."""
+    anthropic.Anthropic(api_key=valor, timeout=20.0, max_retries=1).messages.count_tokens(
+        model=config.MODELO, messages=[{"role": "user", "content": "oi"}])
+
+
 _cliente = None
+_cliente_chave = None
 
 
 def _cliente_claude() -> anthropic.Anthropic:
-    global _cliente
-    if _cliente is None:
-        _cliente = anthropic.Anthropic(timeout=180.0, max_retries=3)
+    global _cliente, _cliente_chave
+    atual = chave()
+    if not atual:
+        raise SemChave()
+    if _cliente is None or atual != _cliente_chave:
+        _cliente = anthropic.Anthropic(api_key=atual, timeout=180.0, max_retries=3)
+        _cliente_chave = atual
     return _cliente
 
 
@@ -414,8 +440,10 @@ def _chamar(mensagens: list, modelo: str, esforco: str):
 
 def motivo_falha(erro: Exception) -> str:
     """Diz em português por que a chamada ao Claude falhou, com o motivo que a API devolveu."""
+    if isinstance(erro, SemChave):
+        return "falta a chave da IA; coloque em Config → Assistente com IA"
     if isinstance(erro, anthropic.AuthenticationError):
-        return "a Anthropic recusou a chave (ANTHROPIC_API_KEY)"
+        return "a Anthropic recusou a chave da IA; troque em Config → Assistente com IA"
     if isinstance(erro, anthropic.APIStatusError):
         corpo = erro.body if isinstance(erro.body, dict) else {}
         detalhe = str((corpo.get("error") or {}).get("message") or "")
@@ -424,6 +452,7 @@ def motivo_falha(erro: Exception) -> str:
         if detalhe:
             return f"{type(erro).__name__}: {detalhe[:300]}"
     return type(erro).__name__
+
 
 def _texto(resposta) -> str:
     return "\n\n".join(b.text.strip() for b in resposta.content if b.type == "text" and b.text.strip())

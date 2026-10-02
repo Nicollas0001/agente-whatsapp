@@ -27,7 +27,7 @@ if not (os.getenv("FIREBASE_AUTH_EMULATOR_HOST") and os.getenv("FIREBASE_SDK_DIR
 from google.cloud import firestore  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
-from app.secretaria import banco, financas as fin  # noqa: E402
+from app.secretaria import banco, financas as fin, repositorio as repo  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 PROJETO = "financas-pessoal-1ca66"  # o mesmo do app
@@ -189,6 +189,15 @@ def servidor_api(monkeypatch, secretaria):
         return "Oi! Em que posso ajudar?"
 
     monkeypatch.setattr(ia, "responder", ia_falsa)
+
+    def testar_chave(valor):
+        if valor != "sk-ant-api03-boa":
+            import anthropic
+            import httpx2
+            resposta = httpx2.Response(401, request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
+            raise anthropic.AuthenticationError("401", response=resposta, body=None)
+
+    monkeypatch.setattr(ia, "testar_chave", testar_chave)
     from app.main import app
     servidor = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"))
     thread = threading.Thread(target=servidor.run, daemon=True)
@@ -252,4 +261,18 @@ def test_app_instalado_conversa_desfaz_e_tarefas(servidor_api, secretaria):
         _esperar(lambda: "Comprar pão" in (pagina.text_content("#tar-lista") or ""), descricao="criar tarefa")
         pagina.click(".tar-check")
         _esperar(lambda: "Comprar pão" not in (pagina.text_content("#tar-lista") or ""), descricao="concluir tarefa")
+
+        # chave da IA trocada pelo próprio app, conferida antes de guardar
+        pagina.goto(f"{servidor_api}/app/?emulador#config")
+        _esperar(lambda: pagina.locator("#ia-key-input").count() == 1, descricao="tela de config")
+        assert "Espaço de trabalho padrão" in pagina.text_content("#tela-config")
+        salvar = "button[onclick='Telas.config.salvarChaveIA()']"
+        pagina.fill("#ia-key-input", "sk-ant-api03-ruim")
+        pagina.click(salvar)
+        _esperar(lambda: "não reconheceu" in (pagina.text_content("#toast") or ""), descricao="recusar chave errada")
+        assert repo.estado_get("anthropic_chave") is None
+        pagina.fill("#ia-key-input", "sk-ant-api03-boa")
+        pagina.click(salvar)
+        _esperar(lambda: "aceitou" in (pagina.text_content("#toast") or ""), descricao="aceitar chave boa")
+        assert repo.estado_get("anthropic_chave") == "sk-ant-api03-boa"
         navegador.close()

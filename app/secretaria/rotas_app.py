@@ -2,10 +2,11 @@
 from pathlib import Path
 from typing import Optional
 
+import anthropic
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
-from app.secretaria import acesso, diario, push, rotinas, repositorio as repo
+from app.secretaria import acesso, diario, ia, push, rotinas, repositorio as repo
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
 ARQUIVOS_PWA = {
@@ -38,7 +39,23 @@ def _erro(funcao, *args):
 
 @api.get("/config")
 def configuracao(dono: dict = Depends(acesso.dono)):
-    return {"vapid": push.chave_publica(), "email": dono.get("email")}
+    return {"vapid": push.chave_publica(), "email": dono.get("email"), "chave_ia": bool(ia.chave())}
+
+
+@api.post("/chave")
+def trocar_chave(chave: str = Body(..., embed=True)):
+    """Chave da Anthropic posta pelo app: só fica guardada se a Anthropic aceitar."""
+    chave = chave.strip()
+    if not chave.startswith("sk-ant-"):
+        raise HTTPException(status_code=400, detail="Isso não parece uma chave da Anthropic (ela começa com sk-ant-).")
+    try:
+        ia.testar_chave(chave)
+    except anthropic.AuthenticationError:
+        raise HTTPException(status_code=400, detail="A Anthropic não reconheceu essa chave. Confira se copiou ela inteira.")
+    except Exception as erro:
+        raise HTTPException(status_code=400, detail=f"A Anthropic não aceitou essa chave ({ia.motivo_falha(erro)}).")
+    repo.estado_set("anthropic_chave", chave)
+    return {"ok": True}
 
 
 @api.post("/mensagem")
