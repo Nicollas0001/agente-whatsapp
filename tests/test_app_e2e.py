@@ -144,6 +144,33 @@ def test_app_e_secretaria_no_mesmo_dado(secretaria, pagina):
     assert erro == "permission-denied"
 
 
+def test_acesso_barrado_nao_suja_o_firebase_com_a_semente(secretaria, pagina):
+    """Tablet abre o app logado mas as regras ainda barram (ex.: regras de teste vencidas)."""
+    semente = pagina.evaluate("SEMENTE")
+    apagada = next(t for t in semente["transacoes"] if t["descricao"] == "Jiu Jitsu (extra julho)")
+    transacoes = [t for t in semente["transacoes"] if t["id"] != apagada["id"]]   # apagada antes, em outro aparelho
+    transacoes.append({**transacoes[0], "id": "nova-la", "descricao": "Salário Marista"})
+    secretaria.collection("financas").document("dados").update({"transacoes": transacoes})
+
+    _entrar(pagina, "intruso@teste.com")
+    _esperar(lambda: pagina.text_content("#sync-dot") == "🔴", descricao="barrar")
+    pagina.reload()
+    _esperar(lambda: pagina.text_content("#sync-dot") == "🔴", descricao="barrar de novo ao reabrir")
+    time.sleep(1)
+    assert pagina.evaluate("localStorage.getItem('ff_transacoes')") is None   # não semeia com erro de acesso
+
+    # aparelho que já tinha só a semente (versão antiga do app semeava com erro); o acesso é liberado
+    pagina.evaluate("seed()")
+    pagina.evaluate("firebase.auth().signOut()")
+    _entrar(pagina, "dono@teste.com")
+    _esperar(lambda: pagina.text_content("#sync-dot") == "🟢", descricao="sincronizar")
+    _esperar(lambda: "Salário Marista" in _descricoes_app(pagina), descricao="baixar dados")
+    time.sleep(2)
+    ids_firestore = {t["id"] for t in secretaria.collection("financas").document("dados").get().to_dict()["transacoes"]}
+    assert ids_firestore == {t["id"] for t in transacoes}                       # nada ressuscitou nem sumiu
+    assert apagada["id"] not in {t["id"] for t in pagina.evaluate("Storage.transacoes()")}
+
+
 # ---------- o app instalado, servido pelo próprio servidor em /app/ ----------
 
 @pytest.fixture
