@@ -4,8 +4,7 @@ import os
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 
-from app.models.database import SessionLocal, DATABASE_URL
-from app.secretaria import config, rotinas, telegram, repositorio as repo
+from app.secretaria import banco, config, rotinas, telegram, repositorio as repo
 
 log = logging.getLogger("secretaria")
 router = APIRouter()
@@ -32,24 +31,20 @@ def receber_telegram(update: dict, tarefas_fundo: BackgroundTasks,
         log.warning("Mensagem ignorada de chat desconhecido %s", chat_id)
         return {"ok": True}
 
-    db = SessionLocal()
-    try:
-        # O Telegram reenvia o mesmo update se a resposta demorar; ignora repetidos.
-        update_id = int(update.get("update_id", 0))
-        if update_id and update_id <= int(repo.estado_get(db, "telegram_update_id") or 0):
-            return {"ok": True}
-        if update_id:
-            repo.estado_set(db, "telegram_update_id", str(update_id))
+    # O Telegram reenvia o mesmo update se a resposta demorar; ignora repetidos.
+    update_id = int(update.get("update_id", 0))
+    if update_id and update_id <= int(repo.estado_get("telegram_update_id") or 0):
+        return {"ok": True}
+    if update_id:
+        repo.estado_set("telegram_update_id", str(update_id))
 
-        texto = (mensagem.get("text") or mensagem.get("caption") or "").strip()
-        if not texto:
-            telegram.enviar(chat_id, "Por enquanto eu só entendo texto. Me escreve o que era?")
-            return {"ok": True}
-        mensagem_id = repo.salvar_mensagem(db, "user", texto, processada=False)
-        if not repo.estado_get(db, "iniciado"):
-            repo.estado_set(db, "iniciado", repo.agora().isoformat())
-    finally:
-        db.close()
+    texto = (mensagem.get("text") or mensagem.get("caption") or "").strip()
+    if not texto:
+        telegram.enviar(chat_id, "Por enquanto eu só entendo texto. Me escreve o que era?")
+        return {"ok": True}
+    mensagem_id = repo.salvar_mensagem("user", texto, processada=False)
+    if not repo.estado_get("iniciado"):
+        repo.estado_set("iniciado", repo.agora().isoformat())
 
     tarefas_fundo.add_task(rotinas.ao_receber, mensagem_id)
     return {"ok": True}
@@ -71,9 +66,10 @@ def status():
         "telegram_token": bool(config.TELEGRAM_BOT_TOKEN),
         "dono_configurado": bool(config.TELEGRAM_OWNER_ID),
         "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
-        "banco": DATABASE_URL.split(":", 1)[0],
+        "firebase": banco.configurado(),
         "url_publica": config.PUBLIC_URL or None,
-        "modelo": config.MODELO,
+        "modelo_dia_a_dia": config.MODELO,
+        "modelo_planejamento": config.MODELO_PLANEJAMENTO,
         "hora_plano": config.HORA_PLANO.strftime("%H:%M"),
         "hora_fechamento": config.HORA_FECHAMENTO.strftime("%H:%M"),
         "agora": repo.agora().isoformat(sep=" "),

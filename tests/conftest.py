@@ -1,36 +1,41 @@
+"""Os testes rodam contra o emulador do Firestore:
+
+    firebase emulators:start --only firestore --project demo-secretaria
+    FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 python -m pytest tests
+"""
 import os
-import tempfile
 from datetime import datetime
 
 import pytest
+import requests
 
-_banco = os.path.join(tempfile.mkdtemp(), "teste.db")
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{_banco}")
 os.environ["TELEGRAM_BOT_TOKEN"] = "token-de-teste"
 os.environ["TELEGRAM_OWNER_ID"] = "42"
 os.environ["SECRETARIA_ESPERA_AGRUPAR_SEG"] = "0"
+os.environ.setdefault("FIREBASE_PROJECT_ID", "demo-secretaria")
 os.environ.pop("CRON_SECRET", None)
+os.environ.pop("FIREBASE_CREDENCIAIS", None)
 
-from app.models import database  # noqa: E402
-from app.secretaria import modelos, repositorio, telegram  # noqa: E402
+from app.secretaria import repositorio, telegram  # noqa: E402
 
-database.create_tables()
+EMULADOR = os.getenv("FIRESTORE_EMULATOR_HOST")
+
+
+def pytest_collection_modifyitems(config, items):
+    if EMULADOR:
+        return
+    pular = pytest.mark.skip(reason="defina FIRESTORE_EMULATOR_HOST (emulador do Firestore)")
+    for item in items:
+        if "sem_banco" not in item.keywords:
+            item.add_marker(pular)
 
 
 @pytest.fixture(autouse=True)
 def limpar_banco():
-    with database.engine.begin() as conn:
-        for tabela in (modelos.tarefas, modelos.registros, modelos.lembretes,
-                       modelos.memorias, modelos.mensagens, modelos.estado):
-            conn.execute(tabela.delete())
+    if EMULADOR:
+        requests.delete(f"http://{EMULADOR}/emulator/v1/projects/{os.environ['FIREBASE_PROJECT_ID']}"
+                        "/databases/(default)/documents", timeout=10).raise_for_status()
     yield
-
-
-@pytest.fixture
-def db():
-    sessao = database.SessionLocal()
-    yield sessao
-    sessao.close()
 
 
 @pytest.fixture

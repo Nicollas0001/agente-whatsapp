@@ -15,6 +15,8 @@ COMANDOS = [
     ("adiantar", "O que fazer agora que adianta o futuro"),
     ("relatorio", "O que eu fiz (hoje, semana ou mes)"),
     ("tarefas", "Lista rápida de tudo que está aberto"),
+    ("financas", "Saldos, faturas e contas do mês"),
+    ("custo", "Quanto a IA custou no mês"),
     ("fechamento", "Fechar o dia agora"),
     ("ajuda", "Como falar comigo"),
 ]

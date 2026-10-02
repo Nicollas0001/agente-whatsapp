@@ -30,9 +30,13 @@ CRON_SECRET = os.getenv("CRON_SECRET", "")
 # O Render define RENDER_EXTERNAL_URL sozinho.
 PUBLIC_URL = (os.getenv("PUBLIC_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
-MODELO = os.getenv("SECRETARIA_MODELO", "claude-opus-5-5")
-ESFORCO_CONVERSA = os.getenv("SECRETARIA_ESFORCO_CONVERSA", "medium")
-ESFORCO_PLANEJAMENTO = os.getenv("SECRETARIA_ESFORCO_PLANEJAMENTO", "high")
+# Dia a dia (anotar gasto, tarefa, responder) no modelo barato; plano do dia,
+# fechamento, /adiantar e relatório no modelo que raciocina melhor.
+MODELO = os.getenv("SECRETARIA_MODELO", "claude-haiku-4-5")
+MODELO_PLANEJAMENTO = os.getenv("SECRETARIA_MODELO_PLANEJAMENTO", "claude-sonnet-5-5")
+ESFORCO_CONVERSA = os.getenv("SECRETARIA_ESFORCO_CONVERSA", "low")  # ignorado no Haiku
+ESFORCO_PLANEJAMENTO = os.getenv("SECRETARIA_ESFORCO_PLANEJAMENTO", "medium")
+COTACAO_DOLAR = float(os.getenv("SECRETARIA_COTACAO_DOLAR", "5.5"))  # só para mostrar o custo em reais
 
 FUSO = ZoneInfo(os.getenv("SECRETARIA_FUSO", "America/Sao_Paulo"))
 HORA_PLANO = _hora(os.getenv("SECRETARIA_HORA_PLANO", ""), "06:00")

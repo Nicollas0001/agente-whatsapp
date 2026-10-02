@@ -1,11 +1,10 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from app.routes import zap
 from app.models import database
-from app.secretaria import config as secretaria_config, rotas as secretaria, rotinas, telegram
+from app.secretaria import banco, config as secretaria_config, rotas as secretaria, rotinas, telegram
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -14,9 +13,9 @@ database.create_tables()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if os.getenv("RENDER") and database.DATABASE_URL.startswith("sqlite"):
+    if not banco.configurado():
         logging.getLogger("secretaria").warning(
-            "Usando SQLite no Render: as tarefas somem a cada deploy/reinício. Configure DATABASE_URL (Postgres).")
+            "FIREBASE_CREDENCIAIS não configurado: a secretária não tem onde guardar tarefas e finanças.")
     if secretaria_config.TELEGRAM_BOT_TOKEN and secretaria_config.PUBLIC_URL:
         logging.getLogger("secretaria").info(
             "Webhook do Telegram: %s", telegram.configurar_webhook(secretaria_config.PUBLIC_URL))

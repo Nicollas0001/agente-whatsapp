@@ -2,6 +2,6 @@ fastapi
 uvicorn
 requests
 sqlalchemy
-psycopg[binary]
 anthropic>=1.11.0
+google-cloud-firestore>=2.19
 tzdata

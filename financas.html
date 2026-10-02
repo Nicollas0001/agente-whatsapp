@@ -613,11 +613,12 @@ canvas { display: block; }
 .recomp-mes { text-align:center; font-size:11px; }
 .recomp-ico { font-size:22px; display:block; }
 .sync-wrap { padding:6px 0 2px; text-align:center; font-size:16px; line-height:1; }
-#sync-dot { cursor:default; }
+#sync-dot { cursor:pointer; }
 </style>
 <!-- Firebase Sync -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 <div id="app">
@@ -744,23 +745,104 @@ const Storage = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   SYNC (Firebase Firestore — auto-sync entre dispositivos)
+   SYNC (Firebase Firestore — entre aparelhos e com a secretária do Telegram)
+   - Só sincroniza com login Google (as regras do Firestore liberam só a sua conta).
+   - Ouve o documento em tempo real: o que a secretária lança aparece na hora.
+   - Ao salvar, junta as mudanças daqui com as que chegaram de fora (por id,
+     dentro de uma transação), em vez de sobrescrever o documento inteiro.
 ═══════════════════════════════════════════════════════════ */
+/* <merge> */
+const SyncMerge = {
+  // campo no Firestore -> chave no localStorage (ff_<chave>)
+  CAMPOS: { contas:'contas', cartoes:'cartoes', transacoes:'transacoes', categorias:'categorias',
+    fixos:'fixos', fixosLog:'fixoslog', investimentos:'investimentos', metaInvest:'metainvest',
+    recompensas:'recompensas', metas:'metas', taxaInvest:'taxainvest', objCompras:'objcompras',
+    objCofre:'objcofre', perfumeMeta:'perfumemeta', patrimonioAlvo:'patralvo', alvoAuto:'alvoauto',
+    recompNome:'recompnome', recompEmoji:'recompemoji' },
+  // JSON com chaves ordenadas: o Firestore devolve os campos em outra ordem
+  estavel(v) {
+    if (Array.isArray(v)) return '[' + v.map(x => this.estavel(x)).join(',') + ']';
+    if (v && typeof v === 'object')
+      return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + this.estavel(v[k])).join(',') + '}';
+    return JSON.stringify(v === undefined ? null : v);
+  },
+  igual(a, b) { return this.estavel(a) === this.estavel(b); },
+  _chave(item) { return item && typeof item === 'object' && item.id != null ? 'id:' + item.id : 'v:' + this.estavel(item); },
+  _mapa(lista) { const m = new Map(); (lista || []).forEach(i => m.set(this._chave(i), i)); return m; },
+  // base = como estava na última sincronização; local = como está aqui; remoto = como está no Firebase
+  lista(base, local, remoto) {
+    const b = this._mapa(base), l = this._mapa(local), r = this._mapa(remoto);
+    const mudouAqui = k => l.has(k) && b.has(k) && !this.igual(l.get(k), b.get(k));
+    const saida = [];
+    for (const [k, item] of r) {
+      if (b.has(k) && !l.has(k)) continue;              // apagado aqui
+      saida.push(mudouAqui(k) ? l.get(k) : item);       // editado aqui vence; senão, vale o de fora
+    }
+    for (const [k, item] of l) {
+      if (r.has(k)) continue;
+      if (!b.has(k) || mudouAqui(k)) saida.push(item);  // criado aqui (ou apagado lá mas editado aqui)
+    }
+    return saida;
+  },
+  juntar(base, local, remoto) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) {
+      const b = base?.[campo], l = local?.[campo], r = remoto?.[campo];
+      if (Array.isArray(l) || Array.isArray(r)) saida[campo] = this.lista(b, l, r);
+      else saida[campo] = this.igual(l, b) ? (r ?? null) : (l ?? null);
+    }
+    return saida;
+  },
+  // primeira sincronização deste aparelho: vale o Firebase, mas o que só existia aqui é mantido
+  primeiraVez(local, remoto) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) saida[campo] = remoto?.[campo] ?? local?.[campo] ?? null;
+    return saida;
+  },
+  doRemoto(dados) {
+    const saida = {};
+    for (const campo of Object.keys(this.CAMPOS)) saida[campo] = dados?.[campo] ?? null;
+    return saida;
+  }
+};
+/* </merge> */
+
 const Sync = (function() {
-  let _db = null, _timer = null, _pulling = false;
+  let _db = null, _auth = null, _user = null, _timer = null, _unsub = null, _pronto = false;
 
   function _doc() { return _db && _db.collection('financas').doc('dados'); }
 
   function _setStatus(s) {
     const el = document.getElementById('sync-dot');
     if (!el) return;
-    const icons = { idle:'🟡', syncing:'🔵', synced:'🟢', error:'🔴', offline:'⚫' };
-    const tips  = { idle:'Sync pendente', syncing:'Sincronizando…', synced:'Sincronizado ✓', error:'Erro de sync', offline:'Sem conexão' };
+    const icons = { idle:'🟡', syncing:'🔵', synced:'🟢', error:'🔴', offline:'⚫', login:'🔑' };
+    const tips  = { idle:'Sync pendente', syncing:'Sincronizando…', synced:'Sincronizado ✓', error:'Erro de sync',
+                    offline:'Sem conexão', login:'Toque para entrar e sincronizar' };
     el.textContent = icons[s] || '🟡';
     el.title = tips[s] || '';
   }
 
+  function _local() {
+    const estado = {};
+    for (const [campo, chave] of Object.entries(SyncMerge.CAMPOS)) estado[campo] = Storage.get(chave);
+    return estado;
+  }
+  // grava direto no localStorage (Storage.set não dispara push)
+  function _aplicar(estado) {
+    for (const [campo, chave] of Object.entries(SyncMerge.CAMPOS)) Storage.set(chave, estado[campo] ?? null);
+  }
+  function _base() { return Storage.get('syncbase'); }
+  function _marcarBase(estado, rev) { Storage.set('syncbase', estado); Storage.set('syncrev', rev || 0); }
+  function _revBase() { return Storage.get('syncrev') || 0; }
+  function _rerender() {
+    const t = typeof Router !== 'undefined' ? Router.atual : null;
+    if (t && Telas[t]?.render) Telas[t].render();
+  }
+  function _esc(t) { return String(t ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
   return {
+    get logado() { return !!_user; },
+
     init() {
       if (typeof firebase === 'undefined') { _setStatus('offline'); return; }
       try {
@@ -775,68 +857,168 @@ const Sync = (function() {
           });
         }
         _db = firebase.firestore();
+        _auth = firebase.auth();
+        if (new URLSearchParams(location.search).has('emulador')) {   // só para testes locais
+          _db.useEmulator('127.0.0.1', 8080);
+          _auth.useEmulator('http://127.0.0.1:9099');
+        }
+        _db.settings({ ignoreUndefinedProperties: true, merge: true });
         _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+        _auth.onAuthStateChanged(u => this._mudouLogin(u));
       } catch(e) { console.warn('Firebase init:', e); }
       window.addEventListener('online',  () => { _setStatus('idle'); this.push(); });
       window.addEventListener('offline', () => _setStatus('offline'));
       if (!navigator.onLine) _setStatus('offline');
+      document.getElementById('sync-dot')?.addEventListener('click', () => this.painel());
+    },
+
+    // espera o Firebase dizer se há alguém logado (sem travar o app se estiver offline)
+    aguardarLogin() {
+      if (!_auth) return Promise.resolve(null);
+      return new Promise(res => {
+        const t = setTimeout(() => res(_auth.currentUser), 5000);
+        const off = _auth.onAuthStateChanged(u => { clearTimeout(t); off(); res(u); });
+      });
+    },
+
+    _mudouLogin(u) {
+      const entrou = u && !_user;
+      _user = u;
+      if (!u) {
+        if (_unsub) { _unsub(); _unsub = null; }
+        _setStatus('login');
+        return;
+      }
+      if (entrou && _pronto) this.pull().then(() => _rerender());
+    },
+
+    _ouvir() {
+      if (_unsub || !_user || !_db) return;
+      _unsub = _doc().onSnapshot(snap => {
+        if (!snap.exists || snap.metadata.hasPendingWrites) return;
+        const dados = snap.data();
+        const rev = dados.rev || 0;
+        if (rev === _revBase()) return;
+        const base = _base();
+        if (!base || !SyncMerge.igual(_local(), base)) { this.push(); return; }  // tem mudança daqui: o push junta
+        const remoto = SyncMerge.doRemoto(dados);
+        _aplicar(remoto);
+        _marcarBase(remoto, rev);
+        if (dados.versao) localStorage.setItem('ff_versao', dados.versao);
+        _setStatus('synced');
+        _rerender();
+        if (dados.alteradoPor === 'secretaria') Utils.toast('💬 Atualizado pela secretária');
+      }, e => {
+        console.warn('Sync listen:', e);
+        _setStatus(e.code === 'permission-denied' ? 'error' : 'offline');
+      });
     },
 
     push() {
-      if (!_db || _pulling) return;
+      if (!_db || !_user) return;
       clearTimeout(_timer);
       _timer = setTimeout(async () => {
         _setStatus('syncing');
+        let localInicio = null;
         try {
-          await _doc().set({
-            contas: Storage.contas(),
-            cartoes: Storage.cartoes(),
-            transacoes: Storage.transacoes(),
-            categorias: Storage.categorias(),
-            fixos: Storage.fixos(),
-            fixosLog: Storage.fixosLog(),
-            investimentos: Storage.investimentos(),
-            metaInvest: Storage.metaInvest(),
-            recompensas: Storage.recompensas(),
-            versao: localStorage.getItem('ff_versao') || '',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          const resultado = await _db.runTransaction(async tx => {
+            const snap = await tx.get(_doc());
+            const dados = snap.exists ? snap.data() : {};
+            const revRemota = dados.rev || 0;
+            const base = _base(), remoto = SyncMerge.doRemoto(dados);
+            localInicio = _local();
+            let final;
+            if (!snap.exists) final = localInicio;
+            else if (!base) final = SyncMerge.primeiraVez(localInicio, remoto);
+            else if (revRemota === _revBase()) {
+              if (SyncMerge.igual(localInicio, base)) return null;   // nada para enviar
+              final = localInicio;
+            } else final = SyncMerge.juntar(base, localInicio, remoto);
+            tx.set(_doc(), { ...final, versao: localStorage.getItem('ff_versao') || '', rev: revRemota + 1,
+                             alteradoPor: 'app', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            return { final, rev: revRemota + 1 };
           });
+          if (resultado) {
+            // se algo mudou aqui durante a transação, aplica por cima do que foi gravado
+            const atual = _local();
+            const novoLocal = SyncMerge.igual(atual, localInicio) ? resultado.final
+                            : SyncMerge.juntar(localInicio, atual, resultado.final);
+            _marcarBase(resultado.final, resultado.rev);
+            if (!SyncMerge.igual(novoLocal, atual)) { _aplicar(novoLocal); _rerender(); }
+            if (!SyncMerge.igual(novoLocal, resultado.final)) this.push();
+          }
           _setStatus('synced');
         } catch(e) {
           console.warn('Sync push:', e);
           _setStatus(navigator.onLine ? 'error' : 'offline');
+          if (e.code === 'permission-denied') Utils.toast('Essa conta Google não tem acesso a estes dados.');
         }
       }, 1500);
     },
 
     async pull() {
       if (!_db) return false;
+      if (!_user) _user = await this.aguardarLogin();
+      _pronto = true;
+      if (!_user) { _setStatus('login'); return false; }
       _setStatus('syncing');
       try {
         const snap = await _doc().get();
-        if (!snap.exists || !snap.data().contas) { _setStatus('idle'); return false; }
-        const d = snap.data();
-        _pulling = true;
-        if (d.contas)            Storage.salvarContas(d.contas);
-        if (d.cartoes)           Storage.salvarCartoes(d.cartoes);
-        if (d.transacoes)        Storage.salvarTransacoes(d.transacoes);
-        if (d.categorias)        Storage.salvarCategorias(d.categorias);
-        if (d.fixos)             Storage.salvarFixos(d.fixos);
-        if (d.fixosLog)          Storage.salvarFixosLog(d.fixosLog);
-        if (d.investimentos)     Storage.salvarInvestimentos(d.investimentos);
-        if (d.metaInvest != null) Storage.salvarMetaInvest(d.metaInvest);
-        if (d.recompensas)       Storage.salvarRecompensas(d.recompensas);
-        if (d.versao)            localStorage.setItem('ff_versao', d.versao);
-        _pulling = false;
+        if (!snap.exists || !snap.data().contas) { _setStatus('idle'); this._ouvir(); return false; }
+        const dados = snap.data();
+        const remoto = SyncMerge.doRemoto(dados), rev = dados.rev || 0;
+        const base = _base(), local = _local();
+        if (!base) {
+          const estado = SyncMerge.primeiraVez(local, remoto);
+          _aplicar(estado);
+          _marcarBase(remoto, rev);
+          if (!SyncMerge.igual(estado, remoto)) this.push();   // sobe o que só existia neste aparelho
+        } else if (SyncMerge.igual(local, base)) {
+          _aplicar(remoto);
+          _marcarBase(remoto, rev);
+        } else {
+          _aplicar(SyncMerge.juntar(base, local, remoto));     // mudanças feitas offline: junta e sobe
+          this.push();
+        }
+        if (dados.versao) localStorage.setItem('ff_versao', dados.versao);
         _setStatus('synced');
+        this._ouvir();
         return true;
       } catch(e) {
-        _pulling = false;
         console.warn('Sync pull:', e);
         _setStatus(navigator.onLine ? 'error' : 'offline');
         return false;
       }
-    }
+    },
+
+    painel() {
+      if (!_auth) return;
+      if (!_user) {
+        Modal.abrir('🔑 Sincronizar', `
+          <p style="font-size:14px;line-height:1.7;color:var(--txt2)">
+            Entre com a sua conta Google para ver aqui o que você manda para a secretária no Telegram
+            e para os seus dados ficarem protegidos (só a sua conta acessa).</p>
+          <div style="margin-top:14px"><button class="btn btn-prim" onclick="Sync.entrar()">Entrar com Google</button></div>`,
+          { footer: false });
+      } else {
+        Modal.abrir('Sincronização', `
+          <p style="font-size:14px;line-height:1.7;color:var(--txt2)">Conectado como <strong>${_esc(_user.email)}</strong>.</p>
+          <div style="margin-top:14px"><button class="btn btn-ghost" onclick="Sync.sair()">Sair desta conta</button></div>`,
+          { footer: false });
+      }
+    },
+
+    async entrar() {
+      try {
+        await _auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+        Modal.fechar();
+      } catch(e) {
+        if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
+          Utils.toast('Não consegui entrar: ' + (e.code || e.message));
+      }
+    },
+
+    async sair() { await _auth.signOut(); Modal.fechar(); }
   };
 })();
 
@@ -844,7 +1026,7 @@ const Sync = (function() {
 ['salvarContas','salvarCartoes','salvarTransacoes','salvarCategorias',
  'salvarFixos','salvarFixosLog','salvarInvestimentos','salvarMetaInvest','salvarRecompensas',
  'salvarPerfumeMeta','salvarPatrimonioAlvo','salvarTaxaInvest','salvarAlvoAuto','salvarRecompNome','salvarRecompEmoji',
- 'salvarObjCompras','salvarObjCofre'
+ 'salvarObjCompras','salvarObjCofre','salvarMetas'
 ].forEach(fn => {
   const orig = Storage[fn].bind(Storage);
   Storage[fn] = function(...args) { orig(...args); Sync.push(); };
@@ -854,6 +1036,7 @@ const Sync = (function() {
    UTILS
 ═══════════════════════════════════════════════════════════ */
 const Utils = {
+  toast(msg, dur) { return toast(msg, dur); },  // várias telas chamam Utils.toast; a função de verdade é a global toast()
   uuid() {
     if (crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -4743,14 +4926,18 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 (async function() {
   Sync.init();
   const pulled = await Sync.pull();
-  if (!pulled) seed();
+  // Sem login não semeia: os dados de verdade estão no Firebase e chegam depois do login
+  if (!pulled && Sync.logado) seed();
   Chat.init();
   // Migração: atualiza meta de R$500 (padrão antigo) para R$900
   if (Storage.metaInvest() === 500) Storage.salvarMetaInvest(900);
-  verificarRecompensa();
-  verificarFixos();
+  // Só lança contas fixas e recompensas com os dados em dia; senão, a secretária
+  // pode ter lançado a mesma conta e ela entraria duas vezes.
+  if (pulled) { verificarRecompensa(); verificarFixos(); }
   verificarVencimentos();
   Router.init();
+
+  if (!Sync.logado) { setTimeout(() => Sync.painel(), 600); return; }
 
   // Avisa se parece ser primeira abertura após atualização de arquivo
   const j = localStorage.getItem('ff_contas');

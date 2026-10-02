@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // App de finanças: só a sua conta Google. Troque o e-mail abaixo pelo seu.
+    match /financas/{doc} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email == "SEU_EMAIL@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+    // Todo o resto (inclusive as coleções sec_* da secretária) só o servidor acessa.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
