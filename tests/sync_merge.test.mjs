@@ -55,11 +55,11 @@ test('itens sem id (fixosLog) se juntam sem repetir', () => {
   assert.equal(final.fixosLog.length, 2);
 });
 
-test('primeira sincronização: vale o Firebase, mas o que só existia aqui fica', () => {
-  const local = { transacoes: [tx('velha', 1)], objCompras: [{ id: 'o1', nome: 'Tênis' }], metaInvest: 900 };
-  const remoto = { transacoes: [tx('a', 10)], objCompras: null, metaInvest: 1000 };
+test('primeira sincronização: junta os dois lados e não perde o que só existia aqui', () => {
+  const local = { transacoes: [tx('a', 10), tx('so-aqui', 1)], objCompras: [{ id: 'o1', nome: 'Tênis' }], metaInvest: 900 };
+  const remoto = { transacoes: [tx('a', 10), tx('so-la', 5)], objCompras: null, metaInvest: 1000 };
   const final = SyncMerge.primeiraVez(local, remoto);
-  assert.deepEqual(ids(final.transacoes), ['a']);
+  assert.deepEqual(ids(final.transacoes), ['a', 'so-la', 'so-aqui']);
   assert.deepEqual(final.objCompras, [{ id: 'o1', nome: 'Tênis' }]);
   assert.equal(final.metaInvest, 1000);
 });
