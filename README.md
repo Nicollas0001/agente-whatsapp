@@ -40,7 +40,7 @@ Os botões no topo da conversa fazem o mesmo que os atalhos: **Plano**, **Adiant
 
 | Item | Custo |
 |---|---|
-| Render (grátis) + cron-job.org | R$0 |
+| Render (grátis) + despertador no GitHub Actions | R$0 |
 | Firebase, plano Spark (Firestore + login Google) | R$0 |
 | Notificações no tablet (Web Push do Chrome) | R$0 |
 | IA: Claude Haiku no dia a dia + Claude Sonnet no plano, fechamento, Adiantar e Relatório | ~US$8–10 (≈R$45–55 + IOF) |
@@ -50,28 +50,24 @@ A estimativa supõe umas 10 a 15 mensagens por dia. O botão **Custo** mostra o 
 ### Configuração (uma vez)
 
 1. **Firebase** ([console](https://console.firebase.google.com), projeto `financas-pessoal-1ca66`):
-   1. *Authentication → Sign-in method*: ative o **Google**.
-   2. *Authentication → Settings → Authorized domains*: adicione o domínio do servidor (ex.: `SEU-APP.onrender.com`).
-   3. *Configurações do projeto → Contas de serviço → Gerar nova chave privada*: baixa um arquivo JSON. Ele dá acesso total ao banco; não coloque no repositório.
+   1. *Authentication → Método de login*: ative o **Google**.
+   2. *Configurações do projeto → Contas de serviço → Gerar nova chave privada*: baixa um arquivo JSON. Ele dá acesso total ao banco; não coloque no repositório nem mande para ninguém.
 2. **Chave do Claude:** em [console.anthropic.com](https://console.anthropic.com), crie uma API key, coloque créditos e defina o limite mensal.
-3. **Render**, nas *Environment Variables* do serviço:
+3. **Render:** abra [render.com/deploy?repo=https://github.com/Nicollas0001/agente-whatsapp](https://render.com/deploy?repo=https://github.com/Nicollas0001/agente-whatsapp), entre com o GitHub e confirme. O [`render.yaml`](render.yaml) cria o servidor sozinho e só pede três valores:
 
    | Variável | Valor |
    |---|---|
-   | `FIREBASE_CREDENCIAIS` | o conteúdo inteiro do JSON do passo 1.3 (ou ele em base64) |
+   | `FIREBASE_CREDENCIAIS` | o conteúdo inteiro do JSON do passo 1.2 |
    | `ANTHROPIC_API_KEY` | chave do passo 2 |
    | `DONO_EMAIL` | o seu e-mail do Google. Só essa conta usa o app |
-   | `CRON_SECRET` | uma senha qualquer, inventada por você |
 
-   Faça o deploy.
-4. **Despertador do servidor:** o Render grátis desliga depois de 15 min sem acesso. Em [cron-job.org](https://cron-job.org), crie um job a cada 10 minutos chamando
-   `https://SEU-APP.onrender.com/secretaria/tick?chave=SEU_CRON_SECRET`.
-   Isso mantém o servidor acordado e dispara plano, fechamento e lembretes. Pode chamar quantas vezes quiser: nada sai duplicado.
-5. **Instalar no tablet:** abra `https://SEU-APP.onrender.com/app/` no Chrome, entre com Google, toque no menu ⋮ e em **Instalar app** (ou **Adicionar à tela inicial**). Depois, na tela **Secretária**, toque em **🔔 Ligar notificações** e aceite. Deve chegar uma notificação de teste.
-6. **Só depois do passo 5**, feche o banco: *Firestore → Regras*, cole o conteúdo de [`firestore.rules`](firestore.rules) trocando `SEU_EMAIL@gmail.com` pelo seu e-mail e publique. Antes disso, qualquer pessoa com o endereço do projeto consegue ler e apagar seus dados financeiros.
-7. **Conferir:** `https://SEU-APP.onrender.com/secretaria/status` deve mostrar `firebase`, `anthropic_key` e `dono_email` como `true`.
+4. **Domínio:** no Firebase, *Authentication → Configurações → Domínios autorizados*, adicione o endereço que o Render deu (ex.: `secretaria-xxxx.onrender.com`).
+5. **Despertador:** já está pronto em [`.github/workflows/secretaria.yml`](.github/workflows/secretaria.yml). O GitHub chama o servidor a cada 10 minutos, de graça, para ele não dormir e para disparar plano, fechamento e lembretes. Só falta pôr o endereço do Render em `SECRETARIA_URL` nesse arquivo. Se o repositório ficar 60 dias sem nenhum commit, o GitHub pausa esse agendamento e manda um e-mail; é só reativar em *Actions*.
+6. **Instalar no tablet:** abra `https://SEU-APP.onrender.com/app/` no Chrome, entre com Google, toque no menu ⋮ e em **Instalar app** (ou **Adicionar à tela inicial**). Depois, na tela **Secretária**, toque em **🔔 Ligar notificações** e aceite. Deve chegar uma notificação de teste.
+7. **Só depois do passo 6**, feche o banco: *Firestore → Regras*, cole o conteúdo de [`firestore.rules`](firestore.rules) trocando `SEU_EMAIL@gmail.com` pelo seu e-mail e publique. Antes disso, qualquer pessoa com o endereço do projeto consegue ler e apagar seus dados financeiros.
+8. **Conferir:** `https://SEU-APP.onrender.com/secretaria/status` deve mostrar `firebase`, `anthropic_key` e `dono_email` como `true`.
 
-O `financas.html` aberto em outro endereço (GitHub Pages, por exemplo) continua funcionando para as finanças, mas a Secretária e as Tarefas só aparecem no endereço do servidor.
+O `financas.html` aberto em outro endereço (GitHub Pages, por exemplo) continua funcionando para as finanças, depois que esse domínio também for autorizado no passo 4. A Secretária e as Tarefas só aparecem no endereço do servidor.
 
 ### Ajustes opcionais
 
