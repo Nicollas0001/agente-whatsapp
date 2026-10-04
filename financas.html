@@ -533,7 +533,7 @@ canvas { display: block; }
   #nav {
     position: fixed;
     top: 0; left: 0; bottom: 0; right: auto;
-    width: 160px; height: 100vh;
+    width: 160px; height: auto;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
@@ -556,7 +556,8 @@ canvas { display: block; }
   #nav a.ativo { border-left-color: var(--prim); background: rgba(108,99,255,0.08); }
   #nav a .nav-ico { font-size: 20px; }
   #nav a span:not(.nav-ico) { display: block; }
-  .sync-wrap { margin-top: auto; padding: 16px 0 4px; border-top: 1px solid var(--borda); }
+  .sync-wrap { margin-top: auto; padding: 12px 0 8px; border-top: 1px solid var(--borda);
+    position: sticky; bottom: -12px; background: var(--sup); }
   #conteudo { margin-left: 160px; width: calc(100% - 160px); padding: 28px 32px 32px; }
   #fab { bottom: 28px; right: 28px; }
   #toast { bottom: 28px; left: 50%; transform: translateX(-50%); }
