@@ -217,6 +217,8 @@ def test_app_instalado_conversa_desfaz_e_tarefas(servidor_api, secretaria):
         pagina.route("https://www.gstatic.com/firebasejs/**",
                      lambda rota: rota.fulfill(path=str(sdk / rota.request.url.rsplit("/", 1)[1]),
                                                content_type="application/javascript"))
+        downloads = []
+        pagina.on("download", lambda d: downloads.append(d.url))   # nada pode virar "baixar arquivo"
         pagina.goto(f"{servidor_api}/app/?emulador#secretaria")
 
         # é um PWA instalável: manifesto e service worker no ar
@@ -275,4 +277,13 @@ def test_app_instalado_conversa_desfaz_e_tarefas(servidor_api, secretaria):
         pagina.click(salvar)
         _esperar(lambda: "aceitou" in (pagina.text_content("#toast") or ""), descricao="aceitar chave boa")
         assert repo.estado_get("anthropic_chave") == "sk-ant-api03-boa"
+
+        # recarregar pega a página do servidor; sem internet, abre a guardada no aparelho
+        resposta = pagina.reload()
+        assert resposta.from_service_worker and resposta.headers["content-type"].startswith("text/html")
+        pagina.context.set_offline(True)
+        pagina.reload()
+        _esperar(lambda: pagina.locator("#nav a[data-tela='secretaria']").count() == 1, descricao="abrir sem internet")
+        pagina.context.set_offline(False)
+        assert downloads == []
         navegador.close()

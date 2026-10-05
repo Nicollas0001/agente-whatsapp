@@ -1,7 +1,8 @@
-// Service worker do app: abre na hora (mesmo com o servidor dormindo ou sem internet)
+// Service worker do app: abre mesmo com o servidor dormindo ou sem internet
 // e mostra as notificações da secretária.
-const CACHE = 'secretaria-v1';
+const CACHE = 'secretaria-v2';
 const BASE = ['./', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
+const ESPERA_REDE_MS = 3000;
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)));
@@ -14,18 +15,36 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
-// Mostra o que está guardado e atualiza por trás; a versão nova vale na próxima abertura.
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin || !url.pathname.startsWith('/app')) return;
-  const pedido = e.request.mode === 'navigate' ? new Request('./') : e.request;
+  if (e.request.mode === 'navigate') { e.respondWith(abrirApp(e)); return; }
+  // ícones e manifesto: mostra o guardado e atualiza por trás
   e.respondWith(caches.open(CACHE).then(async cache => {
-    const guardado = await cache.match(pedido);
-    const daRede = fetch(pedido).then(r => { if (r.ok) cache.put(pedido, r.clone()); return r; });
+    const guardado = await cache.match(e.request);
+    const daRede = fetch(e.request).then(r => { if (r.ok) cache.put(e.request, r.clone()); return r; });
     if (guardado) { e.waitUntil(daRede.catch(() => {})); return guardado; }
     return daRede;
   }));
 });
+
+// A página do app: a versão nova do servidor, se chegar em até 3 s; senão (servidor
+// acordando ou sem internet), a guardada. Só guarda resposta que é mesmo a página.
+async function abrirApp(e) {
+  const cache = await caches.open(CACHE);
+  const daRede = fetch(e.request).then(r => {
+    if (r.ok && (r.headers.get('content-type') || '').startsWith('text/html')) cache.put('./', r.clone());
+    return r;
+  });
+  e.waitUntil(daRede.catch(() => {}));
+  const guardada = await cache.match('./');
+  if (!guardada) return daRede;
+  const espera = new Promise(ok => setTimeout(() => ok(null), ESPERA_REDE_MS));
+  try {
+    const r = await Promise.race([daRede, espera]);
+    return r && r.ok ? r : guardada;
+  } catch { return guardada; }
+}
 
 self.addEventListener('push', e => {
   let d = {};
