@@ -112,17 +112,20 @@ def testar_push():
     return {"entregues": push.enviar("Secretária", "Notificações ligadas. É assim que eu vou te chamar.")}
 
 
-@pwa.get("", include_in_schema=False)
+@pwa.api_route("", methods=["GET", "HEAD"], include_in_schema=False)
 def app_sem_barra():
     return RedirectResponse("/app/")
 
 
-@pwa.get("/", include_in_schema=False)
+# HEAD também: o Chrome do Android às vezes confere a página antes de abrir, e um 405 em JSON
+# no lugar dela pode fazer o navegador tratar a página como arquivo para baixar.
+@pwa.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def app_inicio():
-    return FileResponse(RAIZ / "financas.html", media_type="text/html", headers={"Cache-Control": "no-cache"})
+    return FileResponse(RAIZ / "financas.html", media_type="text/html",
+                        headers={"Cache-Control": "no-cache", "Content-Disposition": "inline"})
 
 
-@pwa.get("/{arquivo}", include_in_schema=False)
+@pwa.api_route("/{arquivo}", methods=["GET", "HEAD"], include_in_schema=False)
 def app_arquivo(arquivo: str):
     if arquivo not in ARQUIVOS_PWA:
         raise HTTPException(status_code=404)

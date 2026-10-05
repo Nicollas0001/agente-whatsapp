@@ -218,5 +218,9 @@ def test_arquivos_do_app(cliente):
     assert sem_login.get("/app/manifest.webmanifest").json()["display"] == "standalone"
     assert "showNotification" in sem_login.get("/app/sw.js").text
     assert sem_login.get("/app/icone-512.png").headers["content-type"] == "image/png"
+    cabeca = sem_login.head("/app/")                                        # o Chrome do Android às vezes confere antes
+    assert cabeca.status_code == 200 and cabeca.headers["content-type"].startswith("text/html")
+    assert pagina.headers["content-disposition"] == "inline"
+    assert sem_login.head("/app/manifest.webmanifest").status_code == 200
     assert sem_login.get("/app/dados_iniciais.json").status_code == 404   # nada além do app sai daqui
     assert sem_login.get("/app/..%2Fagente.db").status_code == 404
