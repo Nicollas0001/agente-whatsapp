@@ -5316,7 +5316,8 @@ document.addEventListener('visibilitychange', () => {
   if (Router.atual === 'tarefas') Telas.tarefas.invalidar();
 });
 if ('serviceWorker' in navigator && Secretaria.noServidor) {
-  navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker:', e));
+  // update(): sem isso o navegador pode seguir com o service worker antigo por até um dia
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(e => console.warn('Service worker:', e));
 }
 
 document.getElementById('fab').addEventListener('click', () => {

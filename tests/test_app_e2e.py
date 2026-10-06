@@ -278,12 +278,9 @@ def test_app_instalado_conversa_desfaz_e_tarefas(servidor_api, secretaria):
         _esperar(lambda: "aceitou" in (pagina.text_content("#toast") or ""), descricao="aceitar chave boa")
         assert repo.estado_get("anthropic_chave") == "sk-ant-api03-boa"
 
-        # recarregar pega a página do servidor; sem internet, abre a guardada no aparelho
+        # abrir o app nunca passa pelo service worker: a página vem direto do servidor, como HTML
         resposta = pagina.reload()
-        assert resposta.from_service_worker and resposta.headers["content-type"].startswith("text/html")
-        pagina.context.set_offline(True)
-        pagina.reload()
-        _esperar(lambda: pagina.locator("#nav a[data-tela='secretaria']").count() == 1, descricao="abrir sem internet")
-        pagina.context.set_offline(False)
+        assert not resposta.from_service_worker and resposta.headers["content-type"].startswith("text/html")
+        assert pagina.evaluate("caches.keys()") == []                       # nenhuma cópia guardada
         assert downloads == []
         navegador.close()
