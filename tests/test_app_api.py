@@ -247,3 +247,22 @@ def test_servidor_se_mantem_acordado(monkeypatch):
     assert len(visitas) == 1                                                # desligado: não visita
     monkeypatch.setattr(repo, "estado_get", lambda chave: None)
     assert rotas.status()["no_ar_desde"] == rotinas.NO_AR_DESDE.isoformat(sep=" ", timespec="seconds")
+
+
+def test_pedidos_do_app_ficam_anotados(cliente):
+    import time
+    from app.secretaria import banco
+    sem_login = TestClient(cliente.app)
+    sem_login.get("/app/?x=1", headers={"User-Agent": "Chrome Android", "Sec-Fetch-Mode": "navigate",
+                                         "Sec-Fetch-Dest": "document"})
+    sem_login.get("/secretaria/app/config")                                # fora de /app: não anota
+    for _ in range(40):
+        docs = [d.to_dict() for d in banco.cliente().collection("sec_diagnostico").stream()
+                if d.to_dict()["caminho"].startswith("/app/?x=1") or d.to_dict()["caminho"].startswith("/secretaria")]
+        if docs:
+            break
+        time.sleep(0.05)
+    assert len(docs) == 1
+    d = docs[0]
+    assert (d["metodo"], d["caminho"], d["status"]) == ("GET", "/app/?x=1", 200)
+    assert d["user-agent"] == "Chrome Android" and d["sec-fetch-mode"] == "navigate"
