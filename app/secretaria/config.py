@@ -47,6 +47,9 @@ FUSO = ZoneInfo(os.getenv("SECRETARIA_FUSO", "America/Sao_Paulo"))
 # do GitHub atrasa horas. Então o próprio servidor visita o endereço público a cada tanto.
 # 0 desliga.
 MANTER_ACORDADO_MIN = int(os.getenv("SECRETARIA_MANTER_ACORDADO_MIN", "10"))
+
+# Anota os cabeçalhos dos pedidos às páginas do app (ver diagnostico.py). 0 desliga.
+DIAGNOSTICO = os.getenv("SECRETARIA_DIAGNOSTICO", "1") != "0"
 HORA_PLANO = _hora(os.getenv("SECRETARIA_HORA_PLANO", ""), "06:00")
 HORA_FECHAMENTO = _hora(os.getenv("SECRETARIA_HORA_FECHAMENTO", ""), "20:00")
 

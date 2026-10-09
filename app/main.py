@@ -1,10 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from app.routes import zap
 from app.models import database
-from app.secretaria import banco, config as secretaria_config, rotas as secretaria, rotas_app, rotinas, telegram
+from app.secretaria import banco, config as secretaria_config, diagnostico, rotas as secretaria, rotas_app, rotinas, telegram
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -31,6 +31,14 @@ app.include_router(zap.router, prefix="/zap", tags=["Zap"])
 app.include_router(secretaria.router, prefix="/secretaria", tags=["Secretária"])
 app.include_router(rotas_app.api, prefix="/secretaria/app", tags=["App"])
 app.include_router(rotas_app.pwa, prefix="/app")
+
+
+@app.middleware("http")
+async def anotar_pedidos_do_app(request: Request, call_next):
+    resposta = await call_next(request)
+    if request.url.path.startswith("/app"):
+        diagnostico.anotar(request.method, request.url.path, request.url.query, request.headers, resposta.status_code)
+    return resposta
 
 @app.get("/")
 def home():
