@@ -6,9 +6,12 @@ import threading
 import time
 from datetime import datetime, timedelta
 
+import requests
+
 from app.secretaria import canal, config, diario, financas, ia, telegram, repositorio as repo
 
 log = logging.getLogger("secretaria")
+NO_AR_DESDE = datetime.now(config.FUSO)
 
 # Uma coisa de cada vez: mensagens e rotinas nunca rodam em paralelo, então a
 # ordem da conversa e os dados ficam consistentes.
@@ -332,15 +335,30 @@ def tick() -> dict:
     return feito
 
 
+def manter_acordado() -> None:
+    """Visita o próprio endereço público: para o Render, é uma visita como outra qualquer,
+    e o servidor não dorme. Dormindo, o Render mostra a tela de "acordando" no lugar do app."""
+    if not (config.PUBLIC_URL and config.MANTER_ACORDADO_MIN > 0):
+        return
+    try:
+        requests.get(f"{config.PUBLIC_URL}/", timeout=30)
+    except requests.RequestException:
+        log.warning("Não consegui visitar %s para manter o servidor acordado", config.PUBLIC_URL)
+
+
 def iniciar_relogio() -> None:
-    """Relógio interno: roda o tick a cada minuto enquanto o servidor está de pé.
-    No Render grátis o servidor dorme; aí quem acorda é o cron externo (/secretaria/tick)."""
+    """Relógio interno: roda o tick a cada minuto enquanto o servidor está de pé e
+    não deixa o servidor dormir. O cron do GitHub (/secretaria/tick) fica de reserva."""
     def laco():
+        minuto = 0
         while True:
             try:
                 tick()
             except Exception:
                 log.exception("Erro no relógio da secretária")
+            if config.MANTER_ACORDADO_MIN > 0 and minuto % config.MANTER_ACORDADO_MIN == 0:
+                manter_acordado()
+            minuto += 1
             time.sleep(60)
 
     threading.Thread(target=laco, daemon=True, name="relogio-secretaria").start()

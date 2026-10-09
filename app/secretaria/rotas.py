@@ -73,4 +73,6 @@ def status():
         "hora_plano": config.HORA_PLANO.strftime("%H:%M"),
         "hora_fechamento": config.HORA_FECHAMENTO.strftime("%H:%M"),
         "agora": repo.agora().isoformat(sep=" "),
+        "no_ar_desde": rotinas.NO_AR_DESDE.isoformat(sep=" ", timespec="seconds"),
+        "manter_acordado_min": config.MANTER_ACORDADO_MIN,
     }
