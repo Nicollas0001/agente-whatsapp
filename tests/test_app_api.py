@@ -224,3 +224,26 @@ def test_arquivos_do_app(cliente):
     assert sem_login.head("/app/manifest.webmanifest").status_code == 200
     assert sem_login.get("/app/dados_iniciais.json").status_code == 404   # nada além do app sai daqui
     assert sem_login.get("/app/..%2Fagente.db").status_code == 404
+
+
+@pytest.mark.sem_banco
+def test_servidor_se_mantem_acordado(monkeypatch):
+    import requests as http
+    from app.secretaria import rotas
+    visitas = []
+    monkeypatch.setattr(rotinas.requests, "get", lambda url, timeout: visitas.append(url))
+    monkeypatch.setattr(config, "PUBLIC_URL", "https://secretaria-teste.onrender.com")
+    rotinas.manter_acordado()
+    assert visitas == ["https://secretaria-teste.onrender.com/"]
+
+    def fora_do_ar(url, timeout):
+        raise http.ConnectionError("sem rede")
+    monkeypatch.setattr(rotinas.requests, "get", fora_do_ar)
+    rotinas.manter_acordado()                                               # falha de rede não derruba o relógio
+
+    monkeypatch.setattr(config, "MANTER_ACORDADO_MIN", 0)
+    monkeypatch.setattr(rotinas.requests, "get", lambda url, timeout: visitas.append(url))
+    rotinas.manter_acordado()
+    assert len(visitas) == 1                                                # desligado: não visita
+    monkeypatch.setattr(repo, "estado_get", lambda chave: None)
+    assert rotas.status()["no_ar_desde"] == rotinas.NO_AR_DESDE.isoformat(sep=" ", timespec="seconds")

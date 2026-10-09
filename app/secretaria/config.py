@@ -42,6 +42,11 @@ ESFORCO_PLANEJAMENTO = os.getenv("SECRETARIA_ESFORCO_PLANEJAMENTO", "medium")
 COTACAO_DOLAR = float(os.getenv("SECRETARIA_COTACAO_DOLAR", "5.5"))  # só para mostrar o custo em reais
 
 FUSO = ZoneInfo(os.getenv("SECRETARIA_FUSO", "America/Sao_Paulo"))
+
+# O Render grátis põe o servidor para dormir depois de 15 min sem visita, e o agendamento
+# do GitHub atrasa horas. Então o próprio servidor visita o endereço público a cada tanto.
+# 0 desliga.
+MANTER_ACORDADO_MIN = int(os.getenv("SECRETARIA_MANTER_ACORDADO_MIN", "10"))
 HORA_PLANO = _hora(os.getenv("SECRETARIA_HORA_PLANO", ""), "06:00")
 HORA_FECHAMENTO = _hora(os.getenv("SECRETARIA_HORA_FECHAMENTO", ""), "20:00")
 
